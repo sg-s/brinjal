@@ -1,6 +1,6 @@
 # brinjal/Makefile
 
-.PHONY: install dev test clean lint format docs build
+.PHONY: install dev test test-fast test-slow clean lint format docs build
 
 # Install dependencies
 install:
@@ -10,9 +10,28 @@ install:
 dev:
 	uv run uvicorn brinjal.main:app --host 0.0.0.0 --port 8000 --reload
 
-# Run tests
+# Run all tests
 test:
 	uv run pytest
+
+# Run fast tests only (exclude slow tests)
+test-fast:
+	uv run pytest -m "not slow"
+
+# Run slow tests only
+test-slow:
+	uv run pytest -m "slow"
+
+# Run specific test file
+test-task-manager:
+	uv run pytest tests/test_task_manager.py -v
+
+test-example-task:
+	uv run pytest tests/test_example_task.py -v
+
+# Run tests with coverage
+test-cov:
+	uv run pytest --cov=brinjal --cov-report=html --cov-report=term
 
 # Clean up
 clean:
@@ -21,6 +40,8 @@ clean:
 	rm -rf build/
 	rm -rf dist/
 	rm -rf *.egg-info/
+	rm -rf htmlcov/
+	rm -rf .coverage
 
 # Lint code
 lint:

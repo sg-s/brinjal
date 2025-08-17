@@ -78,13 +78,15 @@ class Task:
 class ExampleTask(Task):
     """Example task that demonstrates proper task execution and updates"""
 
+    sleep_time: float = 0.1
+
     def run(self):
         """Synchronous function that does the actual work"""
         import time
 
         for i in range(100):
             self.progress = i
-            time.sleep(0.1)
+            time.sleep(self.sleep_time)
 
         self.progress = 100
         self.status = "done"

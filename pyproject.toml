@@ -26,6 +26,24 @@ classifiers = [
     "Framework :: FastAPI",
 ]
 
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+    "jupyter-black>=0.4.0",
+    "pytest>=8.3.4",
+    "pytest-asyncio>=1.1.0",
+]
+docs = [
+    "black>=25.1.0",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=8.2.0",
+    "mkdocs-material-extensions>=1.3.1",
+    "mkdocstrings>=0.28.0",
+    "mkdocstrings-python>=1.14.4",
+]
+
+
 [project.scripts]
 brinjal = "brinjal:main"
 
@@ -46,7 +64,7 @@ build = [
 ]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -57,3 +75,47 @@ packages = ["src/brinjal"]
 
 [tool.hatch.build.targets.wheel.include]
 "src/brinjal/api/static" = "brinjal/api/static"
+
+
+
+
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/brinjal/_version.py"
+
+
+[tool.coverage.run]
+omit = [
+    "tests/*.py",
+]
+
+
+[tool.interrogate]
+fail-under = 100
+exclude = ["setup.py", "docs", "build","tests","variables","conftest.py"]
+ignore-init-method = true
+ignore-init-module = true
+ignore-magic = true
+ignore-semiprivate = true
+ignore-private = true
+ignore-property-decorators = true
+ignore-nested-functions = true
+ignore-nested-classes = true
+ignore-setters = false
+ignore-regex = ["^get$", "^mock_.*", ".*BaseClass.*"]
+color = true
+
+[tool.ruff]
+include = [
+    "**/src/**/*.py",
+    "**/tests/**/*.py",
+]
+
+[tool.ruff.lint]
+ignore = ["E203", "E266", "E501"]
+
+[tool.ruff.lint.isort]
+case-sensitive = true
