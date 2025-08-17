@@ -1,5 +1,7 @@
 # 🍆 Brinjal
 
+![](docs/images/hero.gif)
+
 A generic, reusable task management system built with FastAPI and asyncio. Brinjal provides a foundation for building applications that need to manage long-running tasks with real-time progress updates via Server-Sent Events (SSE).
 
 ## Features
