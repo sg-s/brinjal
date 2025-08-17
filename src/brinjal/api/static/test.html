@@ -8,13 +8,24 @@
 </head>
 <body>
     <div class="container py-4">
-        <h1>Brinjal TaskList Test</h1>
+        <h1>Brinjal TaskList Component Test</h1>
+        <p>This page tests the TaskList web component from brinjal.</p>
         
-        <!-- Test the TaskList component -->
-        <task-list base_url="http://localhost:8000"></task-list>
+        <!-- Use the TaskList web component -->
+        <task-list id="taskList" base_url="http://localhost:8000"></task-list>
+        
+        <div class="mt-4">
+            <h3>Test Instructions:</h3>
+            <ol>
+                <li>Add a task using: <code>curl -X POST http://localhost:8000/example_task</code></li>
+                <li>Watch the task appear and progress in real-time</li>
+                <li>Check the browser console for any errors</li>
+            </ol>
+        </div>
     </div>
 
-    <!-- Load the TaskList component from brinjal -->
-    <script src="/api/tasks/static/TaskList.js"></script>
+    <!-- Load the TaskList component -->
+    <!-- Note: The path will depend on how the consuming application includes this router -->
+    <script src="/static/TaskList.js"></script>
 </body>
 </html>

@@ -157,7 +157,7 @@ class TaskList extends HTMLElement {
             this.activeSSEConnections.get(task.task_id).close();
             this.activeSSEConnections.delete(task.task_id);
         }
-        const url = `${this.baseUrl}/api/tasks/${task.task_id}/stream`;
+        const url = `${this.baseUrl}/${task.task_id}/stream`;
         const eventSource = new EventSource(url, { withCredentials: true });
         eventSource.onmessage = (event) => {
             const data = JSON.parse(event.data);
@@ -186,7 +186,7 @@ class TaskList extends HTMLElement {
             </div>
         `;
         try {
-            const response = await fetch(`${this.baseUrl}/api/tasks/queue`);
+            const response = await fetch(`${this.baseUrl}/queue`);
             const tasks = await response.json();
             this.taskGrid.innerHTML = '';
             if (tasks.length === 0) {

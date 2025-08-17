@@ -1,164 +1,156 @@
-# 🍆 Brinjal
+# Brinjal
 
 ![](docs/images/hero.gif)
 
-A generic, reusable task management system built with FastAPI and asyncio. Brinjal provides a foundation for building applications that need to manage long-running tasks with real-time progress updates via Server-Sent Events (SSE).
+A generic, reusable task management system built with FastAPI and asyncio. Brinjal provides a flexible foundation for building task-based applications with real-time progress updates via Server-Sent Events (SSE).
 
 ## Features
 
-- **Generic Task Framework**: Base `Task` class that can be extended for any type of work
-- **Real-time Updates**: Server-Sent Events (SSE) for live progress monitoring
-- **Asynchronous Execution**: Built on asyncio for non-blocking task processing
-- **Web Component**: Reusable `<task-list>` component for displaying tasks
-- **Self-contained**: No external static file mounting required
-- **Easy Integration**: Simple router inclusion for any FastAPI application
+- **Generic Task Management**: Base `Task` class that can be extended for any type of task
+- **Real-time Updates**: Server-Sent Events (SSE) for live progress updates
+- **Asynchronous Execution**: Built on asyncio for high-performance task processing
+- **Flexible Integration**: No hardcoded prefixes - easily integrated into any FastAPI application
+- **Web Components**: Reusable frontend components for displaying tasks
+- **Progress Tracking**: Built-in progress monitoring and status updates
 
 ## Quick Start
 
 ### Installation
 
 ```bash
+pip install brinjal
+```
+
+### Running the Development Server
+
+```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/sg-s/brinjal.git
 cd brinjal
 
 # Install dependencies
-make install
+uv sync
 
 # Run the development server
 make dev
 ```
 
-### Testing End-to-End
+The server will start at `http://localhost:8000`.
 
-1. **Start the server:**
-   ```bash
-   make dev
-   ```
+### End-to-End Testing
 
-2. **Create an example task:**
-   ```bash
-   curl -X POST "http://localhost:8000/api/tasks/example_task"
-   ```
+1. **Start the server**: `make dev`
+2. **Add a task**: `curl -X POST http://localhost:8000/api/tasks/example_task`
+3. **View the test page**: Open `http://localhost:8000/api/tasks/test` in your browser
+4. **Watch real-time updates**: The task will appear and progress in real-time
 
-3. **Check task status:**
-   ```bash
-   curl "http://localhost:8000/api/tasks/queue"
-   ```
-
-4. **Stream real-time updates:**
-   ```bash
-   # Replace {task_id} with the actual task ID from step 2
-   curl "http://localhost:8000/api/tasks/{task_id}/stream"
-   ```
-
-5. **View the web interface:**
-   - Open `http://localhost:8000/api/tasks/test` in your browser
-   - See the TaskList component in action
-
-## Usage in Your Project
+## Usage in Other Projects
 
 ### Basic Integration
 
 ```python
 from fastapi import FastAPI
-from brinjal.api.router import router
+from brinjal.api.router import router as brinjal_router
 
 app = FastAPI()
-app.include_router(router)
 
-# That's it! Your app now has:
-# - /api/tasks/queue - List all tasks
-# - /api/tasks/{task_id}/stream - SSE stream for task updates
-# - /api/tasks/static/* - Static files (TaskList.js, etc.)
+# Include brinjal with your desired prefix
+app.include_router(brinjal_router, prefix="/api/tasks")
 ```
 
-### Creating Custom Tasks
+### Advanced Integration with Custom Endpoints
 
 ```python
-from brinjal.task import Task
-import time
+from fastapi import APIRouter
+from brinjal.api.router import router as brinjal_router
+from brinjal.manager import task_manager
 
-class MyCustomTask(Task):
-    def run(self):
-        """Implement your synchronous work here"""
-        for i in range(10):
-            self.progress = i * 10
-            time.sleep(1)
-        
-        self.status = "done"
-        self.progress = 100
-        self.heading = "Custom Task Complete"
-        self.body = "This task did something amazing!"
+# Create your main router with the desired prefix
+router = APIRouter(prefix="/api/tasks")
+
+# Include all of brinjal's functionality
+router.include_router(brinjal_router)
+
+# Add your custom endpoints
+@router.post("/custom_task")
+async def custom_task():
+    # Your custom logic here
+    pass
+
+# Include in your main app
+app.include_router(router)
 ```
 
-### Using the TaskList Component
+### Frontend Integration
 
 ```html
-<!DOCTYPE html>
-<html>
-<head>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <task-list base_url="http://localhost:8000"></task-list>
-    <script src="http://localhost:8000/api/tasks/static/TaskList.js"></script>
-</body>
-</html>
+<!-- Load the TaskList component from your brinjal endpoint -->
+<script src="/api/tasks/static/TaskList.js"></script>
+
+<!-- Use the component -->
+<task-list base_url="https://yourdomain.com"></task-list>
 ```
 
 ## API Reference
 
-### Endpoints
+### Core Endpoints
 
-- `POST /api/tasks/example_task` - Create an example task
 - `GET /api/tasks/queue` - Get all tasks
-- `GET /api/tasks/{task_id}/stream` - SSE stream for task updates
+- `POST /api/tasks/example_task` - Create an example task
+- `GET /api/tasks/{task_id}/stream` - Stream task updates via SSE
 - `GET /api/tasks/static/{file}` - Static files (TaskList.js, etc.)
 
-### Task Model
+### Data Models
 
-```python
-@dataclass
-class Task:
-    task_id: str
-    status: str  # "pending", "running", "done", "failed"
-    progress: int  # 0-100
-    img: Optional[str] = None
-    heading: Optional[str] = None
-    body: Optional[str] = None
-```
+- **TaskUpdate**: Generic task update model with `task_id`, `task_type`, `status`, `progress`, `img`, `heading`, `body`
 
 ## Development
 
+### Running Tests
+
 ```bash
-# Install dependencies
-make install
-
-# Run development server
-make dev
-
-# Run tests
+# Run all tests
 make test
 
-# Lint code
-make lint
+# Run specific test suites
+make test-task-manager
+make test-example-task
 
-# Format code
-make format
+# Run with coverage
+make test-cov
+```
 
-# Clean up
-make clean
+### Building Documentation
+
+```bash
+make docs
+```
+
+### Building the Package
+
+```bash
+make build
 ```
 
 ## Architecture
 
-- **`Task`**: Base class for all tasks
-- **`TaskManager`**: Manages task queue and execution
-- **`TaskUpdate`**: Pydantic model for task updates
-- **`ExampleTask`**: Sample implementation
-- **`TaskList.js`**: Web component for displaying tasks
+Brinjal is designed with separation of concerns in mind:
+
+- **`Task`**: Base class for all tasks with common functionality
+- **`TaskManager`**: Manages task execution and SSE event generation
+- **`ExampleTask`**: Concrete implementation demonstrating task patterns
+- **Router**: FastAPI router with generic endpoints (no hardcoded prefixes)
+- **Static Files**: Web components and assets for frontend integration
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
 
 ## License
 
-GPL V3
+MIT License - see [LICENSE.txt](LICENSE.txt) for details.

@@ -1,46 +1,55 @@
 # API Reference
 
-This document provides a complete reference for all Brinjal API endpoints, data models, and response formats.
+This document provides a comprehensive reference for all Brinjal API endpoints, data models, and integration patterns.
 
-## Base URL
+## Overview
 
-All API endpoints are prefixed with `/api/tasks`.
+Brinjal provides a generic task management system that can be integrated into any FastAPI application. The API is designed to be flexible and prefix-free, allowing you to control the URL structure in your application.
 
-## Authentication
+## Integration Patterns
 
-Currently, Brinjal does not implement authentication. All endpoints are publicly accessible.
+### Basic Integration
+
+```python
+from fastapi import FastAPI
+from brinjal.api.router import router as brinjal_router
+
+app = FastAPI()
+
+# Include brinjal with your desired prefix
+app.include_router(brinjal_router, prefix="/api/tasks")
+```
+
+### Advanced Integration with Custom Endpoints
+
+```python
+from fastapi import APIRouter
+from brinjal.api.router import router as brinjal_router
+from brinjal.manager import task_manager
+
+# Create your main router with the desired prefix
+router = APIRouter(prefix="/api/tasks")
+
+# Include all of brinjal's functionality
+router.include_router(brinjal_router)
+
+# Add your custom endpoints
+@router.post("/custom_task")
+async def custom_task():
+    # Your custom logic here
+    pass
+
+# Include in your main app
+app.include_router(router)
+```
 
 ## Endpoints
 
 ### Task Management
 
-#### Create Example Task
+#### `GET /api/tasks/queue`
 
-```http
-POST /api/tasks/example_task
-```
-
-Creates a new example task and adds it to the execution queue.
-
-**Response:**
-```json
-{
-  "task_id": "550e8400-e29b-41d4-a716-446655440000"
-}
-```
-
-**Example:**
-```bash
-curl -X POST "http://localhost:8000/api/tasks/example_task"
-```
-
-#### Get All Tasks
-
-```http
-GET /api/tasks/queue
-```
-
-Returns a list of all tasks with their current status and progress.
+Returns all tasks in the system with their current status and progress.
 
 **Response:**
 ```json
@@ -50,63 +59,50 @@ Returns a list of all tasks with their current status and progress.
     "task_type": "ExampleTask",
     "status": "running",
     "progress": 45,
-    "results": null,
-    "video_id": null,
-    "channel_id": null
+    "img": null,
+    "heading": null,
+    "body": null
   }
 ]
 ```
 
-**Example:**
-```bash
-curl "http://localhost:8000/api/tasks/queue"
+#### `POST /api/tasks/example_task`
+
+Creates and starts a new example task.
+
+**Response:**
+```json
+{
+  "task_id": "550e8400-e29b-41d4-a716-446655440000"
+}
 ```
 
-#### Stream Task Updates
+### Real-time Updates
 
-```http
-GET /api/tasks/{task_id}/stream
-```
+#### `GET /api/tasks/{task_id}/stream`
 
 Streams real-time updates for a specific task using Server-Sent Events (SSE).
 
 **Parameters:**
 - `task_id` (string): The unique identifier of the task
 
-**Response:**
+**Response:** Server-Sent Events stream
 ```
 data: {"task_id": "550e8400-e29b-41d4-a716-446655440000", "task_type": "ExampleTask", "status": "running", "progress": 0, "img": null, "heading": null, "body": null}
 
 data: {"task_id": "550e8400-e29b-41d4-a716-446655440000", "task_type": "ExampleTask", "status": "running", "progress": 10, "img": null, "heading": null, "body": null}
 
-...
-
 data: {"task_id": "550e8400-e29b-41d4-a716-446655440000", "task_type": "ExampleTask", "status": "done", "progress": 100, "img": null, "heading": null, "body": null}
 ```
 
-**Example:**
-```bash
-curl "http://localhost:8000/api/tasks/550e8400-e29b-41d4-a716-446655440000/stream"
-```
-
-**Notes:**
-- This endpoint returns a Server-Sent Events stream
-- Each line starting with `data:` contains a JSON object
-- The stream continues until the task is complete or the client disconnects
-- Keepalive messages (`: keepalive`) are sent every 10 seconds
-
 ### Static Files
 
-#### Get Static File
+#### `GET /api/tasks/static/{file_path}`
 
-```http
-GET /api/tasks/static/{file_path}
-```
-
-Serves static files from the Brinjal package.
+Serves static files from the brinjal package, including the TaskList web component.
 
 **Parameters:**
-- `file_path` (string): Path to the file within the static directory
+- `file_path` (string): Path to the static file within the brinjal package
 
 **Available Files:**
 - `TaskList.js` - The TaskList web component
@@ -119,103 +115,89 @@ curl "http://localhost:8000/api/tasks/static/TaskList.js"
 
 ### Testing
 
-#### Get Test Page
+#### `GET /api/tasks/test`
 
-```http
-GET /api/tasks/test
-```
+Returns a test HTML page that demonstrates the TaskList component in action.
 
-Returns an HTML page that demonstrates the TaskList component.
-
-**Response:**
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brinjal TaskList Test</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container py-4">
-        <h1>Brinjal TaskList Test</h1>
-        <task-list base_url="http://localhost:8000"></task-list>
-    </div>
-    <script src="/api/tasks/static/TaskList.js"></script>
-</body>
-</html>
-```
-
-**Example:**
-```bash
-curl "http://localhost:8000/api/tasks/test"
-```
+**Response:** HTML page with embedded TaskList component
 
 ## Data Models
 
-### Task
-
-The base task model that all tasks inherit from.
-
-```python
-@dataclass
-class Task:
-    task_id: str                    # Unique identifier
-    status: str                     # Current status
-    progress: int                   # Progress percentage (0-100)
-    results: Optional[Any]          # Task results
-    update_queue: asyncio.Queue     # Internal update queue
-    loop: Optional[asyncio.AbstractEventLoop]  # Event loop reference
-    img: Optional[str]              # Image URL for display
-    heading: Optional[str]          # Task title
-    body: Optional[str]             # Task description
-```
-
-**Status Values:**
-- `"pending"` - Task is queued but not yet started
-- `"running"` - Task is currently executing
-- `"done"` - Task completed successfully
-- `"failed"` - Task failed with an error
-- `"cancelled"` - Task was cancelled
-
 ### TaskUpdate
 
-Pydantic model for task updates sent via SSE.
+Generic model for task updates sent via SSE.
 
 ```python
 class TaskUpdate(BaseModel):
     task_id: str
     task_type: str
-    status: Literal["pending", "running", "done", "failed", "cancelled"]
+    status: Literal["pending", "running", "done", "failed", "cancelled"] = "pending"
     progress: int
     img: Optional[str] = None
     heading: Optional[str] = None
     body: Optional[str] = None
 ```
 
-### ExampleTask
+**Fields:**
+- `task_id`: Unique identifier for the task
+- `task_type`: Class name of the task (e.g., "ExampleTask")
+- `status`: Current status of the task
+- `progress`: Progress percentage (0-100)
+- `img`: Optional image URL for the task
+- `heading`: Optional title/heading for the task
+- `body`: Optional description text for the task
 
-A sample task implementation for testing and demonstration.
+## Task Manager
+
+### Global Instance
+
+Brinjal provides a global task manager instance that you can use directly:
 
 ```python
-@dataclass
-class ExampleTask(Task):
-    def run(self):
-        """Synchronous function that does the actual work"""
-        import time
-        
-        for i in range(100):
-            self.progress = i
-            time.sleep(0.1)
-        
-        self.progress = 100
-        self.status = "done"
+from brinjal.manager import task_manager
+
+# Start the worker loop
+await task_manager.start()
+
+# Add a task
+task = ExampleTask()
+task_id = await task_manager.add_task_to_queue(task)
+
+# Get task information
+task = task_manager.get_task(task_id)
+all_tasks = task_manager.get_all_tasks()
+
+# Stop the worker loop
+await task_manager.stop()
 ```
 
-## Error Responses
+### Custom Instance
 
-### 404 Not Found
+You can also create custom task manager instances:
+
+```python
+from brinjal.manager import TaskManager
+
+# Create a custom instance
+custom_manager = TaskManager()
+
+# Start the worker loop
+await custom_manager.start()
+
+# Use the custom instance
+task_id = await custom_manager.add_task_to_queue(task)
+```
+
+## Error Handling
+
+### HTTP Status Codes
+
+- `200 OK`: Request successful
+- `404 Not Found`: Task or file not found
+- `403 Forbidden`: Access denied (for static file security)
+- `500 Internal Server Error`: Server error
+
+### Error Response Format
 
 ```json
 {
@@ -223,85 +205,134 @@ class ExampleTask(Task):
 }
 ```
 
-Returned when:
-- Requesting a task that doesn't exist
-- Accessing a static file that doesn't exist
+## Security Considerations
 
-### 403 Forbidden
+### Static File Access
 
-```json
-{
-  "detail": "Access denied"
-}
+The static file endpoint includes security checks to prevent directory traversal attacks:
+
+- Files must be within the brinjal package's static directory
+- Relative paths are resolved and validated
+- Access outside the static directory is denied
+
+### Task Isolation
+
+- Each task runs in its own context
+- Tasks cannot access other tasks' data
+- Progress updates are isolated per task
+
+## Performance
+
+### Task Execution
+
+- Tasks run asynchronously using asyncio
+- Long-running operations use `asyncio.to_thread` to avoid blocking
+- Progress updates are batched to prevent overwhelming the client
+
+### SSE Optimization
+
+- Server-Sent Events are streamed efficiently
+- Connection state is monitored for disconnections
+- Unused connections are cleaned up automatically
+
+## Monitoring and Debugging
+
+### Logging
+
+Brinjal uses Python's standard logging module:
+
+```python
+import logging
+
+# Enable debug logging
+logging.basicConfig(level=logging.DEBUG)
 ```
 
-Returned when:
-- Attempting to access files outside the static directory (security measure)
+### Health Checks
 
-## Rate Limiting
+Monitor the task manager status:
 
-Currently, Brinjal does not implement rate limiting. All endpoints can be called as frequently as needed.
+```python
+from brinjal.manager import task_manager
 
-## CORS
+# Check if worker loop is running
+is_running = task_manager._worker_task is not None and not task_manager._worker_task.done()
 
-Brinjal does not implement CORS headers. If you need CORS support, you'll need to add it to your FastAPI application.
-
-## WebSocket Support
-
-Brinjal uses Server-Sent Events (SSE) instead of WebSockets for real-time updates. SSE is simpler to implement and provides one-way communication from server to client, which is perfect for task progress updates.
+# Get queue size
+queue_size = task_manager.task_queue.qsize()
+```
 
 ## Examples
 
-### Complete Task Lifecycle
+### Complete Integration Example
 
-1. **Create a task:**
-   ```bash
-   curl -X POST "http://localhost:8000/api/tasks/example_task"
-   # Response: {"task_id": "abc123"}
-   ```
+```python
+from fastapi import FastAPI
+from brinjal.api.router import router as brinjal_router
+from brinjal.manager import task_manager
 
-2. **Check initial status:**
-   ```bash
-   curl "http://localhost:8000/api/tasks/queue"
-   # Response: [{"task_id": "abc123", "status": "pending", ...}]
-   ```
+app = FastAPI(title="My Task App")
 
-3. **Stream updates:**
-   ```bash
-   curl "http://localhost:8000/api/tasks/abc123/stream"
-   # Streams progress updates until completion
-   ```
+# Include brinjal
+app.include_router(brinjal_router, prefix="/api/tasks")
 
-4. **Check final status:**
-   ```bash
-   curl "http://localhost:8000/api/tasks/queue"
-   # Response: [{"task_id": "abc123", "status": "done", ...}]
-   ```
+@app.on_event("startup")
+async def startup():
+    await task_manager.start()
 
-### Using with JavaScript
+@app.on_event("shutdown")
+async def shutdown():
+    await task_manager.stop()
 
-```javascript
-// Create a task
-const response = await fetch('/api/tasks/example_task', {
-    method: 'POST'
-});
-const { task_id } = await response.json();
-
-// Stream updates
-const eventSource = new EventSource(`/api/tasks/${task_id}/stream`);
-eventSource.onmessage = (event) => {
-    const update = JSON.parse(event.data);
-    console.log(`Task ${update.task_id}: ${update.progress}%`);
-    
-    if (update.status === 'done' || update.status === 'failed') {
-        eventSource.close();
-    }
-};
+# Your custom endpoints here
+@app.post("/api/tasks/custom")
+async def custom_endpoint():
+    # Your logic here
+    pass
 ```
 
-## Next Steps
+### Frontend Integration Example
 
-- [Learn how to create custom tasks](./task-development.md)
-- [Explore integration options](./integration.md)
-- [Understand the web component](./web-component.md)
-- [See practical examples](./examples.md)
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>My Task Dashboard</h1>
+        
+        <!-- Load the TaskList component -->
+        <script src="/api/tasks/static/TaskList.js"></script>
+        
+        <!-- Use the component -->
+        <task-list base_url="https://myapp.com"></task-list>
+    </div>
+</body>
+</html>
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Tasks not executing**: Ensure `task_manager.start()` is called
+2. **SSE not working**: Check that the task exists and the stream endpoint is accessible
+3. **Static files 404**: Verify the router is included with the correct prefix
+4. **Import errors**: Ensure brinjal is properly installed
+
+### Debug Steps
+
+1. Check application logs for errors
+2. Verify endpoint accessibility with curl
+3. Test SSE streaming manually
+4. Check browser console for JavaScript errors
+
+## Support
+
+For additional help:
+
+- **Documentation**: [docs.brinjal.dev](https://docs.brinjal.dev)
+- **Issues**: [GitHub Issues](https://github.com/sg-s/brinjal/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/sg-s/brinjal/discussions)

@@ -12,7 +12,6 @@ from pathlib import Path
 static_path = Path(__file__).parent / "static"
 
 router = APIRouter(
-    prefix="/api/tasks",
     tags=["tasks"],
     responses={404: {"description": "Not found"}},
 )

@@ -1,55 +1,132 @@
 # Brinjal Documentation
 
-Welcome to the Brinjal documentation! This guide will help you understand how to use Brinjal in your projects.
+Welcome to the Brinjal documentation! Brinjal is a generic, reusable task management system built with FastAPI and asyncio.
 
 ## What is Brinjal?
 
-Brinjal is a generic task management system that provides:
+Brinjal provides a flexible foundation for building task-based applications with real-time progress updates via Server-Sent Events (SSE). It's designed to be easily integrated into any FastAPI application without hardcoded prefixes or assumptions about your URL structure.
 
-- A base `Task` class for creating custom tasks
-- Real-time progress updates via Server-Sent Events (SSE)
-- A web component for displaying tasks
-- Easy integration with FastAPI applications
+## Key Features
 
-## Quick Navigation
+- **Generic Task Framework**: Base `Task` class that can be extended for any type of work
+- **Real-time Updates**: Server-Sent Events (SSE) for live progress monitoring
+- **Asynchronous Execution**: Built on asyncio for non-blocking task processing
+- **Flexible Integration**: No hardcoded prefixes - easily integrated into any FastAPI application
+- **Web Components**: Reusable `<task-list>` component for displaying tasks
+- **Self-contained**: No external static file mounting required
 
-- [Getting Started](./getting-started.md) - Installation and basic setup
-- [Task Development](./task-development.md) - How to create custom tasks
-- [API Reference](./api-reference.md) - Complete API documentation
-- [Web Component](./web-component.md) - Using the TaskList component
-- [Integration Guide](./integration.md) - Adding Brinjal to your project
-- [Examples](./examples.md) - Code examples and use cases
+## Quick Start
 
-## Core Concepts
+### Installation
 
-### Task
-A `Task` represents a unit of work that can be executed asynchronously. Tasks can update their progress and status, which are automatically pushed to connected clients.
+```bash
+pip install brinjal
+```
 
-### TaskManager
-The `TaskManager` handles the execution of tasks, manages the task queue, and coordinates real-time updates.
+### Basic Integration
 
-### TaskUpdate
-A Pydantic model that represents the state of a task at any given moment, used for serializing task data.
+```python
+from fastapi import FastAPI
+from brinjal.api.router import router as brinjal_router
 
-### Web Component
-A reusable `<task-list>` component that displays tasks and automatically updates as tasks progress.
+app = FastAPI()
+
+# Include brinjal with your desired prefix
+app.include_router(brinjal_router, prefix="/api/tasks")
+```
+
+That's it! Your app now has access to:
+- Task management endpoints
+- Real-time progress streaming
+- Web components for the frontend
+
+## Documentation Sections
+
+### 🚀 [Getting Started](getting-started.md)
+Learn how to install Brinjal and integrate it into your FastAPI application. Includes step-by-step examples and troubleshooting tips.
+
+### 📚 [API Reference](api-reference.md)
+Complete reference for all API endpoints, data models, and integration patterns. Essential for developers building with Brinjal.
+
+### 🔧 [Task Development](task-development.md)
+Learn how to create custom tasks by extending the base `Task` class. Includes examples and best practices.
+
+## Architecture Overview
+
+Brinjal is designed with separation of concerns in mind:
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   FastAPI App   │    │   Brinjal       │    │   Your Custom   │
+│                 │    │   Router        │    │   Endpoints     │
+│                 │◄───┤                 │◄───┤                 │
+│                 │    │                 │    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Your Prefix   │    │   Generic       │    │   Application   │
+│   /api/tasks    │    │   Functionality │    │   Logic         │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+## Integration Patterns
+
+### Simple Integration
+```python
+app.include_router(brinjal_router, prefix="/api/tasks")
+```
+
+### Advanced Integration with Custom Endpoints
+```python
+router = APIRouter(prefix="/api/tasks")
+router.include_router(brinjal_router)
+
+@router.post("/custom_task")
+async def custom_task():
+    # Your custom logic here
+    pass
+
+app.include_router(router)
+```
+
+## Examples
+
+### Frontend Integration
+```html
+<!-- Load the TaskList component -->
+<script src="/api/tasks/static/TaskList.js"></script>
+
+<!-- Use the component -->
+<task-list base_url="https://yourdomain.com"></task-list>
+```
+
+### Custom Task Creation
+```python
+from brinjal.task import Task
+
+class MyCustomTask(Task):
+    def run(self):
+        # Your synchronous work here
+        for i in range(10):
+            self.progress = i * 10
+            time.sleep(1)
+        
+        self.status = "done"
+        self.progress = 100
+```
 
 ## Getting Help
 
-If you have questions or need help:
-
-1. Check the [Examples](./examples.md) section for common use cases
-2. Review the [API Reference](./api-reference.md) for detailed endpoint information
-3. Look at the source code in the `src/brinjal/` directory
-4. Create an issue in the project repository
+- **Issues**: Report bugs on [GitHub](https://github.com/sg-s/brinjal/issues)
+- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/sg-s/brinjal/discussions)
+- **Documentation**: Browse the full documentation at [docs.brinjal.dev](https://docs.brinjal.dev)
 
 ## Contributing
 
-Brinjal is designed to be extensible. If you want to contribute:
+We welcome contributions! Please see our [contributing guidelines](https://github.com/sg-s/brinjal/blob/main/CONTRIBUTING.md) for details.
 
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Submit a pull request
+## License
 
-See the [Development Guide](./development.md) for more details on the development workflow.
+Brinjal is licensed under the MIT License. See [LICENSE.txt](../LICENSE.txt) for details.

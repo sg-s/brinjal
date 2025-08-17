@@ -1,203 +1,195 @@
 # Getting Started with Brinjal
 
-This guide will walk you through installing Brinjal and testing it end-to-end.
-
-## Prerequisites
-
-- Python 3.13 or higher
-- `uv` package manager (recommended) or `pip`
-- Git
+This guide will help you get up and running with Brinjal, a generic task management system for FastAPI applications.
 
 ## Installation
 
-### 1. Clone the Repository
+### From PyPI (Recommended)
 
 ```bash
-git clone <your-repo-url>
+pip install brinjal
+```
+
+### From Source
+
+```bash
+git clone https://github.com/sg-s/brinjal.git
 cd brinjal
-```
-
-### 2. Install Dependencies
-
-```bash
-# Using uv (recommended)
-make install
-
-# Or manually with uv
 uv sync
-
-# Or with pip
-pip install -e .
 ```
 
-### 3. Verify Installation
+## Quick Start
 
-```bash
-# Check if the package can be imported
-python -c "import brinjal; print('Brinjal installed successfully!')"
+### 1. Basic Integration
+
+The simplest way to use Brinjal is to include its router in your FastAPI application:
+
+```python
+from fastapi import FastAPI
+from brinjal.api.router import router as brinjal_router
+
+app = FastAPI()
+
+# Include brinjal with your desired prefix
+app.include_router(brinjal_router, prefix="/api/tasks")
 ```
 
-## Running the Development Server
+That's it! Your app now has access to:
 
-### Start the Server
+- `GET /api/tasks/queue` - List all tasks
+- `POST /api/tasks/example_task` - Create an example task
+- `GET /api/tasks/{task_id}/stream` - Stream task updates via SSE
+- `GET /api/tasks/static/*` - Static files (TaskList.js, etc.)
 
-```bash
-make dev
+### 2. Advanced Integration with Custom Endpoints
+
+For more complex applications, you can extend Brinjal's functionality:
+
+```python
+from fastapi import APIRouter
+from brinjal.api.router import router as brinjal_router
+from brinjal.manager import task_manager
+
+# Create your main router with the desired prefix
+router = APIRouter(prefix="/api/tasks")
+
+# Include all of brinjal's functionality
+router.include_router(brinjal_router)
+
+# Add your custom endpoints
+@router.post("/custom_task")
+async def custom_task():
+    # Your custom logic here
+    pass
+
+# Include in your main app
+app.include_router(router)
 ```
 
-This will start the FastAPI server on `http://localhost:8000` with auto-reload enabled.
+### 3. Frontend Integration
 
-### Verify the Server is Running
+Brinjal includes a reusable web component for displaying tasks:
 
-```bash
-curl http://localhost:8000/docs
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Load the TaskList component from your brinjal endpoint -->
+    <script src="/api/tasks/static/TaskList.js"></script>
+    
+    <!-- Use the component -->
+    <task-list base_url="https://yourdomain.com"></task-list>
+</body>
+</html>
 ```
 
-You should see the FastAPI interactive documentation.
+## Testing Your Integration
 
-## End-to-End Testing
-
-### 1. Create an Example Task
+### 1. Start Your Application
 
 ```bash
+uvicorn your_app:app --reload
+```
+
+### 2. Test the Endpoints
+
+```bash
+# Create an example task
 curl -X POST "http://localhost:8000/api/tasks/example_task"
-```
 
-**Expected Response:**
-```json
-{
-  "task_id": "550e8400-e29b-41d4-a716-446655440000"
-}
-```
-
-**What Happens:**
-- A new `ExampleTask` is created and added to the task queue
-- The task starts executing automatically
-- Progress updates are sent every 0.1 seconds
-
-### 2. Check Task Status
-
-```bash
+# Check the task queue
 curl "http://localhost:8000/api/tasks/queue"
-```
 
-**Expected Response:**
-```json
-[
-  {
-    "task_id": "550e8400-e29b-41d4-a716-446655440000",
-    "task_type": "ExampleTask",
-    "status": "running",
-    "progress": 45,
-    "results": null,
-    "video_id": null,
-    "channel_id": null
-  }
-]
-```
-
-### 3. Stream Real-Time Updates
-
-```bash
-# Replace {task_id} with the actual task ID from step 1
+# Stream task updates (replace {task_id} with actual ID)
 curl "http://localhost:8000/api/tasks/{task_id}/stream"
 ```
 
-**Expected Output:**
-```
-data: {"task_id": "550e8400-e29b-41d4-a716-446655440000", "task_type": "ExampleTask", "status": "running", "progress": 0, "img": null, "heading": null, "body": null}
-
-data: {"task_id": "550e8400-e29b-41d4-a716-446655440000", "task_type": "ExampleTask", "status": "running", "progress": 10, "img": null, "heading": null, "body": null}
-
-data: {"task_id": "550e8400-e29b-41d4-a716-446655440000", "task_type": "ExampleTask", "status": "running", "progress": 20, "img": null, "heading": null, "body": null}
-
-...
-
-data: {"task_id": "550e8400-e29b-41d4-a716-446655440000", "task_type": "ExampleTask", "status": "done", "progress": 100, "img": null, "heading": null, "body": null}
-```
-
-**What You'll See:**
-- Initial task state
-- Progress updates every 0.1 seconds (0, 1, 2, ..., 99, 100)
-- Final status when complete
-
-### 4. Test the Web Interface
+### 3. Test the Web Interface
 
 Open your browser and navigate to:
+- `http://localhost:8000/api/tasks/test` - Test page with TaskList component
+
+## Creating Custom Tasks
+
+Brinjal provides a base `Task` class that you can extend:
+
+```python
+from brinjal.task import Task
+import time
+
+class MyCustomTask(Task):
+    def run(self):
+        """Implement your synchronous work here"""
+        for i in range(10):
+            self.progress = i * 10
+            time.sleep(1)
+        
+        self.status = "done"
+        self.progress = 100
+        self.heading = "Custom Task Complete"
+        self.body = "This task did something amazing!"
+
+# Use with the task manager
+from brinjal.manager import task_manager
+
+task = MyCustomTask()
+task_id = await task_manager.add_task_to_queue(task)
 ```
-http://localhost:8000/api/tasks/test
+
+## Configuration
+
+### Task Manager Settings
+
+The task manager can be configured when creating custom instances:
+
+```python
+from brinjal.manager import TaskManager
+
+# Create a custom task manager
+custom_manager = TaskManager()
+
+# Start the worker loop
+await custom_manager.start()
+
+# Add tasks
+task_id = await custom_manager.add_task_to_queue(task)
 ```
 
-**What You'll See:**
-- A clean HTML page with Bootstrap styling
-- The TaskList component displaying tasks
-- Real-time updates as tasks progress
-- Progress bars that move automatically
+### Environment Variables
 
-### 5. Create Multiple Tasks
+Brinjal respects standard FastAPI configuration. You can set:
 
-```bash
-# Create several tasks in parallel
-curl -X POST "http://localhost:8000/api/tasks/example_task" &
-curl -X POST "http://localhost:8000/api/tasks/example_task" &
-curl -X POST "http://localhost:8000/api/tasks/example_task" &
-wait
-```
-
-**What Happens:**
-- Multiple tasks are created simultaneously
-- Each task runs independently
-- The web interface shows all tasks
-- Progress bars update in real-time for each task
+- `LOG_LEVEL` - Logging level (default: INFO)
+- `WORKER_CONCURRENCY` - Number of concurrent workers (default: 1)
 
 ## Troubleshooting
 
 ### Common Issues
 
-**Task not starting:**
-```bash
-# Check if the worker loop is running
-curl "http://localhost:8000/api/tasks/queue"
-```
-
-**Static files not loading:**
-```bash
-# Verify the static file route works
-curl "http://localhost:8000/api/tasks/static/TaskList.js"
-```
-
-**SSE not working:**
-```bash
-# Check if the task exists
-curl "http://localhost:8000/api/tasks/queue"
-# Then try streaming with the correct task ID
-```
+1. **Static files not loading**: Ensure your router is properly included with the correct prefix
+2. **Tasks not executing**: Check that the task manager is started (`await task_manager.start()`)
+3. **SSE not working**: Verify the stream endpoint is accessible and the task exists
 
 ### Debug Mode
 
-To see detailed logs, check the terminal where you ran `make dev`. You should see:
-- Worker loop starting
-- Tasks being picked up
-- Progress updates being sent
-- Task completion messages
+Enable debug logging:
+
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+```
 
 ## Next Steps
 
-Now that you've tested Brinjal end-to-end:
+- Read the [API Reference](api-reference.md) for detailed endpoint documentation
+- Check out [Task Development](task-development.md) for advanced task creation patterns
+- Explore the [examples](../examples/) directory for more use cases
 
-1. [Learn how to create custom tasks](./task-development.md)
-2. [Understand the API endpoints](./api-reference.md)
-3. [Integrate Brinjal into your project](./integration.md)
-4. [Explore the web component](./web-component.md)
+## Getting Help
 
-## Summary
-
-You've successfully:
-- ✅ Installed Brinjal
-- ✅ Started the development server
-- ✅ Created and monitored tasks
-- ✅ Viewed real-time progress updates
-- ✅ Tested the web interface
-- ✅ Verified SSE streaming works
-
-Brinjal is ready to use! The system automatically handles task execution, progress monitoring, and real-time updates. You can now focus on implementing your specific task logic.
+- **Issues**: Report bugs on [GitHub](https://github.com/sg-s/brinjal/issues)
+- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/sg-s/brinjal/discussions)
+- **Documentation**: Browse the full documentation at [docs.brinjal.dev](https://docs.brinjal.dev)
