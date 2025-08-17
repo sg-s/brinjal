@@ -1,0 +1,22 @@
+[project]
+name = "brinjal"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Srinivas Gorur-Shandilya", email = "code@srinivas.gs" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "beartype>=0.21.0",
+    "fastapi>=0.116.1",
+    "pydantic>=2.11.7",
+    "uvicorn>=0.35.0",
+]
+
+[project.scripts]
+brinjal = "brinjal:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
