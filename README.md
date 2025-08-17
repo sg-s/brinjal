@@ -161,4 +161,4 @@ make clean
 
 ## License
 
-[Your License Here]
+GPL V3

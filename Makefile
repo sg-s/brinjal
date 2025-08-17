@@ -1,6 +1,6 @@
 # brinjal/Makefile
 
-.PHONY: install dev test clean lint format docs
+.PHONY: install dev test clean lint format docs build
 
 # Install dependencies
 install:
@@ -33,3 +33,9 @@ format:
 # Serve documentation
 docs:
 	uv run mkdocs serve --dev-addr=0.0.0.0:8080
+
+# Build package
+build:
+	uv run python -m build
+	@echo "Package built successfully!"
+	@echo "Check dist/ directory for wheel and source distribution"

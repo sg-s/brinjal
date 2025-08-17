@@ -1,0 +1,17 @@
+# Include static files
+include src/brinjal/api/static/*.js
+include src/brinjal/api/static/*.html
+include src/brinjal/api/static/*.css
+
+
+
+
+
+# Exclude unnecessary files
+exclude .gitignore
+exclude .DS_Store
+exclude __pycache__/
+exclude *.pyc
+exclude .pytest_cache/
+exclude .venv/
+exclude uv.lock
