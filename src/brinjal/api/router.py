@@ -7,6 +7,7 @@ from ..manager import task_manager
 from ..task import ExampleTask, ProgressHookExampleTask
 
 from pathlib import Path
+import asyncio
 
 # Get the static directory path for serving files
 static_path = Path(__file__).parent / "static"
