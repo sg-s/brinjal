@@ -1,6 +1,6 @@
 [project]
 name = "brinjal"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A generic, reusable task management system built with FastAPI and asyncio"
 readme = "README.md"
 authors = [
