@@ -7,6 +7,7 @@ from ..manager import task_manager
 from ..task import ExampleTask
 
 from pathlib import Path
+import asyncio
 
 # Get the static directory path for serving files
 static_path = Path(__file__).parent / "static"
@@ -66,11 +67,12 @@ async def test():
     """test endpoint that returns the test.html file"""
     test_html_path = static_path / "test.html"
     try:
-        with open(test_html_path, "r", encoding="utf-8") as f:
-            content = f.read()
+        content = await asyncio.to_thread(
+            open, test_html_path, "r", encoding="utf-8"
+        ).read()
         return HTMLResponse(content=content)
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="test.html not found")
+        raise HTTPException(status_code=404, detail="test.html not found") from None
 
 
 @router.get("/static/{file_path:path}")
@@ -82,7 +84,7 @@ async def serve_static_file(file_path: str):
     try:
         file_path_obj.resolve().relative_to(static_path.resolve())
     except ValueError:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise HTTPException(status_code=403, detail="Access denied") from None
 
     if not file_path_obj.exists():
         raise HTTPException(status_code=404, detail="File not found")
