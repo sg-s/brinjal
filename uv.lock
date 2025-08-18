@@ -102,7 +102,6 @@ jupyter = [
 
 [[package]]
 name = "brinjal"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "beartype" },
@@ -148,7 +147,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "uvicorn", specifier = ">=0.35.0" },
 ]
-provides-extras = ["docs", "build"]
+provides-extras = ["build", "docs"]
 
 [package.metadata.requires-dev]
 dev = [

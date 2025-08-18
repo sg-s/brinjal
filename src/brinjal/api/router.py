@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
 from ..manager import task_manager
 
-from ..task import ExampleTask
+from ..task import ExampleTask, ProgressHookExampleTask
 
 from pathlib import Path
 import asyncio
@@ -62,15 +62,23 @@ async def example_task():
     return {"task_id": task_id}
 
 
+@router.post("/progress_hook_example_task")
+async def progress_hook_example_task():
+    """example task that does nothing"""
+
+    # Create the example task
+    task = ProgressHookExampleTask()
+
+    # Add to queue
+    task_id = await task_manager.add_task_to_queue(task)
+    return {"task_id": task_id}
+
+
 @router.get("/test", response_class=HTMLResponse)
 async def test():
     """test endpoint that returns the test.html file"""
-    test_html_path = static_path / "test.html"
     try:
-        content = await asyncio.to_thread(
-            open, test_html_path, "r", encoding="utf-8"
-        ).read()
-        return HTMLResponse(content=content)
+        return FileResponse(static_path / "test.html", media_type="text/html")
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="test.html not found") from None
 
