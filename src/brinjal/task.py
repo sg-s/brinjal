@@ -22,6 +22,15 @@ class Task:
     heading: Optional[str] = None
     body: Optional[str] = None
 
+    def progress_hook(self):
+        """Hook method for subclasses to inject custom progress logic.
+
+        This method is called before checking if progress has changed.
+        Subclasses can override this to read progress from external sources
+        (like log files, APIs, etc.) and update self.progress.
+        """
+        pass
+
     async def notify_update(self):
         """Generic notify_update method that sends task status to the update queue"""
         update_data = TaskUpdate(
@@ -53,6 +62,9 @@ class Task:
         # Monitor progress and send updates
         last_progress = 0
         while not sync_task.done():
+            # Call progress_hook to allow subclasses to update progress
+            self.progress_hook()
+
             # Check if progress has changed
             if self.progress != last_progress:
                 await self.notify_update()

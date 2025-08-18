@@ -98,10 +98,6 @@ class TaskManager:
                 "task_type": task.__class__.__name__,
                 "status": task.status,
                 "progress": task.progress,
-                "results": task.results,
-                # Extract specific data for display
-                "video_id": getattr(task, "video_id", None),
-                "channel_id": getattr(task, "channel_id", None),
             }
             for task in self.task_store.values()
         ]
@@ -138,7 +134,7 @@ class TaskManager:
                     yield f"data: {json.dumps(update)}\n\n"
 
                     # If the task is done or failed, break and end the stream
-                    if update["status"] in ("done", "failed"):
+                    if update["status"] in ("done", "failed", "cancelled"):
                         break
                 except asyncio.TimeoutError:
                     # Send keepalive
