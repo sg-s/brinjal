@@ -7,6 +7,7 @@ class TaskUpdate(BaseModel):
     """Base model for task updates"""
 
     task_id: str
+    parent_id: Optional[str] = None  # What started this task
     task_type: str
     status: Literal["pending", "running", "done", "failed", "cancelled"] = "pending"
     progress: int

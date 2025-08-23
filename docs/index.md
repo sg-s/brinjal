@@ -51,6 +51,9 @@ Complete reference for all API endpoints, data models, and integration patterns.
 ### 🔧 [Task Development](task-development.md)
 Learn how to create custom tasks by extending the base `Task` class. Includes examples and best practices.
 
+### ⏰ [Recurring Tasks](recurring-tasks.md)
+Learn how to set up automated recurring tasks using cron-like syntax. Includes scheduling, monitoring, and best practices.
+
 ## Architecture Overview
 
 Brinjal is designed with separation of concerns in mind:
