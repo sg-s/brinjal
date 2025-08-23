@@ -13,6 +13,7 @@ class Task:
     """Generic task base class"""
 
     task_id: str = field(default_factory=lambda: str(uuid4()))
+    parent_id: Optional[str] = None  # What started this task
     status: str = "pending"
     progress: int = 0
     results: Optional[Any] = None
@@ -41,6 +42,7 @@ class Task:
         """Generic notify_update method that sends task status to the update queue"""
         update_data = TaskUpdate(
             task_id=self.task_id,
+            parent_id=self.parent_id,
             task_type=self.__class__.__name__,
             status=self.status,
             progress=self.progress,

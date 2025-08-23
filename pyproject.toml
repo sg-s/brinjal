@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "beartype>=0.21.0",
+    "croniter>=2.0.0",
     "fastapi>=0.116.1",
     "pydantic>=2.11.7",
     "uvicorn>=0.35.0",
