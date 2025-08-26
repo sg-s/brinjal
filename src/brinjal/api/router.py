@@ -34,6 +34,17 @@ async def get_all_tasks():
     return task_manager.get_all_tasks()
 
 
+@router.get("/queue/stream")
+async def stream_queue_updates(request: Request):
+    """Stream real-time updates when tasks are added/removed from the queue"""
+    # Get the event generator from the task manager for queue updates
+    event_generator = task_manager.get_queue_sse_event_generator(request)
+    if not event_generator:
+        raise HTTPException(status_code=404, detail="Queue stream not available")
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
 @router.get("/{task_id}/stream")
 async def stream_task_updates(task_id: str, request: Request):
     """Stream real-time updates for a specific task"""

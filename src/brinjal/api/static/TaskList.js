@@ -9,6 +9,7 @@ class TaskList extends HTMLElement {
     init() {
         this.render();
         this.loadTasks();
+        this.startQueueSSEConnection();
     }
 
     render() {
@@ -204,6 +205,53 @@ class TaskList extends HTMLElement {
         }
     }
 
+    // Start SSE connection for queue updates
+    startQueueSSEConnection() {
+        const url = `${this.baseUrl}/queue/stream`;
+        this.queueEventSource = new EventSource(url, { withCredentials: true });
+        
+        this.queueEventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            this.handleQueueUpdate(data);
+        };
+        
+        this.queueEventSource.onerror = (err) => {
+            console.error('Queue SSE error:', err);
+            // Attempt to reconnect after a delay
+            setTimeout(() => {
+                if (this.queueEventSource.readyState === EventSource.CLOSED) {
+                    this.startQueueSSEConnection();
+                }
+            }, 5000);
+        };
+    }
+
+    // Handle queue updates (new tasks, removed tasks, etc.)
+    handleQueueUpdate(data) {
+        if (data.type === 'task_added') {
+            // New task added to queue
+            const task = data.task;
+            const card = this.renderTaskCard(task);
+            this.taskGrid.appendChild(card);
+            this.startSSEConnection(task);
+        } else if (data.type === 'task_removed') {
+            // Task removed from queue (completed, failed, etc.)
+            const taskId = data.task_id;
+            const card = this.querySelector(`#task-${taskId}`);
+            if (card) {
+                card.remove();
+                // Close the task's SSE connection if it exists
+                if (this.activeSSEConnections.has(taskId)) {
+                    this.activeSSEConnections.get(taskId).close();
+                    this.activeSSEConnections.delete(taskId);
+                }
+            }
+        } else if (data.type === 'queue_updated') {
+            // Full queue update - refresh the entire list
+            this.loadTasks();
+        }
+    }
+
     // Public method to refresh tasks
     refresh() {
         this.loadTasks();
@@ -216,6 +264,11 @@ class TaskList extends HTMLElement {
             connection.close();
         }
         this.activeSSEConnections.clear();
+        
+        // Close queue SSE connection
+        if (this.queueEventSource) {
+            this.queueEventSource.close();
+        }
     }
 }
 

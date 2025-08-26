@@ -44,6 +44,8 @@ class TaskManager:
         self._worker_task = None
         self._recurring_task = None
         self.loop = None
+        # Queue SSE subscribers - map subscriber_id to notification queue
+        self.queue_subscribers = {}
 
     async def start(self):  # this needs to be async
         """Start the worker loop"""
@@ -117,12 +119,62 @@ class TaskManager:
         # put the task on the queue
         await self.task_queue.put(task)
         self.task_store[task.task_id] = task
+
+        # Notify queue subscribers of new task
+        await self._notify_queue_subscribers("task_added", task)
+
         logger.info(f"Task {task.task_id} added to queue successfully")
         return task.task_id
+
+    async def _notify_queue_subscribers(
+        self, event_type: str, task: Task = None, task_id: str = None
+    ):
+        """Notify all queue subscribers of queue changes"""
+        if not self.queue_subscribers:
+            return
+
+        # Prepare the notification data
+        if event_type == "task_added":
+            notification = {
+                "type": event_type,
+                "task": {
+                    "task_id": task.task_id,
+                    "parent_id": task.parent_id,
+                    "task_type": task.__class__.__name__,
+                    "status": task.status,
+                    "progress": task.progress,
+                    "img": getattr(task, "img", None),
+                    "heading": getattr(task, "heading", None),
+                    "body": getattr(task, "body", None),
+                },
+            }
+        elif event_type == "task_removed":
+            notification = {"type": event_type, "task_id": task_id}
+        else:
+            return
+
+        # Send notification to all subscribers
+        for subscriber_id, queue in self.queue_subscribers.items():
+            try:
+                await queue.put(notification)
+            except Exception as e:
+                logger.error(f"Failed to notify subscriber {subscriber_id}: {e}")
+                # Remove failed subscriber
+                self.queue_subscribers.pop(subscriber_id, None)
 
     def get_task(self, task_id: str) -> Optional[Task]:
         """Get a task by ID"""
         return self.task_store.get(task_id)
+
+    async def remove_task_from_store(self, task_id: str):
+        """Remove a task from the store and notify queue subscribers"""
+        if task_id in self.task_store:
+            task = self.task_store.pop(task_id)
+            # Notify queue subscribers of removed task
+            await self._notify_queue_subscribers("task_removed", task_id=task_id)
+            logger.info(f"Task {task_id} removed from store")
+            return task
+        return None
 
     def get_all_tasks(self) -> List[dict]:
         """Get all tasks with their status and progress"""
@@ -133,6 +185,9 @@ class TaskManager:
                 "task_type": task.__class__.__name__,
                 "status": task.status,
                 "progress": task.progress,
+                "img": getattr(task, "img", None),
+                "heading": getattr(task, "heading", None),
+                "body": getattr(task, "body", None),
             }
             for task in self.task_store.values()
         ]
@@ -175,6 +230,41 @@ class TaskManager:
                 except asyncio.TimeoutError:
                     # Send keepalive
                     yield ": keepalive\n\n"
+
+        return event_generator
+
+    def get_queue_sse_event_generator(self, request):
+        """Get an SSE event generator for queue updates"""
+
+        async def event_generator():
+            # Create a unique subscriber ID for this connection
+            subscriber_id = id(request)
+            self.queue_subscribers[subscriber_id] = asyncio.Queue()
+
+            try:
+                # Send initial queue state
+                initial_tasks = self.get_all_tasks()
+                yield f"data: {json.dumps({'type': 'queue_updated', 'tasks': initial_tasks})}\n\n"
+
+                # Monitor for queue changes
+                while True:
+                    # Check if client disconnected
+                    if await request.is_disconnected():
+                        break
+
+                    try:
+                        # Wait for notifications with timeout
+                        notification = await asyncio.wait_for(
+                            self.queue_subscribers[subscriber_id].get(), timeout=30
+                        )
+                        yield f"data: {json.dumps(notification)}\n\n"
+                    except asyncio.TimeoutError:
+                        # Send keepalive
+                        yield ": keepalive\n\n"
+
+            finally:
+                # Remove subscriber when connection closes
+                self.queue_subscribers.pop(subscriber_id, None)
 
         return event_generator
 
