@@ -7,7 +7,6 @@ from ..manager import task_manager
 from ..task import ExampleTask, ProgressHookExampleTask
 
 from pathlib import Path
-import asyncio
 
 # Get the static directory path for serving files
 static_path = Path(__file__).parent / "static"
@@ -59,6 +58,22 @@ async def stream_task_updates(task_id: str, request: Request):
         raise HTTPException(status_code=404, detail="Task not found")
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.delete("/{task_id}")
+async def delete_task(task_id: str):
+    """Delete a task by ID from the store"""
+    # Check if task exists
+    task = task_manager.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Remove the task from the store
+    removed_task = await task_manager.remove_task_from_store(task_id)
+    if removed_task:
+        return {"message": f"Task {task_id} deleted successfully"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to delete task")
 
 
 @router.post("/example_task")

@@ -90,6 +90,11 @@ class TaskList extends HTMLElement {
                                     </div>
                                     <span class="badge bg-${badgeClass} me-2">${task.status.toUpperCase()}</span>
                                     <span class="badge bg-info">${taskTypeDisplay}</span>
+                                    ${task.status === 'done' || task.status === 'failed' || task.status === 'cancelled' ? 
+                                        `<button class="btn btn-sm btn-outline-danger ms-2" onclick="document.querySelector('#task-${task.task_id}').deleteTask('${task.task_id}')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>` : ''
+                                    }
                                 </div>
                                 
                                 <h6 class="card-title mb-2">${title}</h6>
@@ -120,6 +125,11 @@ class TaskList extends HTMLElement {
                             </div>
                             <span class="badge bg-${badgeClass} me-2">${task.status.toUpperCase()}</span>
                             <span class="badge bg-info">${taskTypeDisplay}</span>
+                            ${task.status === 'done' || task.status === 'failed' || task.status === 'cancelled' ? 
+                                `<button class="btn btn-sm btn-outline-danger ms-2" onclick="document.querySelector('#task-${task.task_id}').deleteTask('${task.task_id}')">
+                                    <i class="bi bi-trash"></i>
+                                </button>` : ''
+                            }
                         </div>
                         
                         <h6 class="card-title mb-2">${title}</h6>
@@ -138,6 +148,11 @@ class TaskList extends HTMLElement {
                 </div>
             `;
         }
+        
+        // Add deleteTask method to the card element
+        card.deleteTask = (taskId) => {
+            this.deleteTask(taskId);
+        };
         
         return card;
     }
@@ -231,6 +246,10 @@ class TaskList extends HTMLElement {
         if (data.type === 'task_added') {
             // New task added to queue
             const task = data.task;
+            
+            // Clear "No tasks found" message if it exists
+            this.updateNoTasksMessage();
+            
             const card = this.renderTaskCard(task);
             this.taskGrid.appendChild(card);
             this.startSSEConnection(task);
@@ -246,15 +265,62 @@ class TaskList extends HTMLElement {
                     this.activeSSEConnections.delete(taskId);
                 }
             }
+            
+            // Update "No tasks found" message if needed
+            this.updateNoTasksMessage();
         } else if (data.type === 'queue_updated') {
             // Full queue update - refresh the entire list
             this.loadTasks();
         }
     }
 
+    // Helper method to update "No tasks found" message
+    updateNoTasksMessage() {
+        const hasTasks = this.taskGrid.children.length > 0;
+        const noTasksMessage = this.querySelector('.text-muted');
+        
+        if (!hasTasks && !noTasksMessage) {
+            // No tasks and no message - add the message
+            this.taskGrid.innerHTML = '<div class="col-12"><p class="text-muted">No tasks found</p></div>';
+        } else if (hasTasks && noTasksMessage && noTasksMessage.textContent === 'No tasks found') {
+            // Has tasks but still showing "No tasks found" - remove the message
+            noTasksMessage.remove();
+        }
+    }
+
     // Public method to refresh tasks
     refresh() {
         this.loadTasks();
+    }
+
+    // Delete a task by ID
+    async deleteTask(taskId) {
+        try {
+            const response = await fetch(`${this.baseUrl}/${taskId}`, {
+                method: 'DELETE',
+            });
+            
+            if (response.ok) {
+                // Task deleted successfully - remove from display
+                const card = this.querySelector(`#task-${taskId}`);
+                if (card) {
+                    card.remove();
+                    // Close the task's SSE connection if it exists
+                    if (this.activeSSEConnections.has(taskId)) {
+                        this.activeSSEConnections.get(taskId).close();
+                        this.activeSSEConnections.delete(taskId);
+                    }
+                    // Update "No tasks found" message if needed
+                    this.updateNoTasksMessage();
+                }
+            } else {
+                console.error('Failed to delete task:', response.statusText);
+                alert('Failed to delete task. Please try again.');
+            }
+        } catch (err) {
+            console.error('Error deleting task:', err);
+            alert('Error deleting task. Please try again.');
+        }
     }
 
     // Cleanup method

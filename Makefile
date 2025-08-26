@@ -8,7 +8,7 @@ install:
 
 # Run the FastAPI app in development mode
 dev:
-	uv run uvicorn brinjal.main:app --host 0.0.0.0 --port 8000 --reload
+	uv run uvicorn brinjal.main:app --host 0.0.0.0 --port 8000 --reload & open http://localhost:8000/test
 
 # Run all tests
 test:
