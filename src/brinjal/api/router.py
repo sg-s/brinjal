@@ -63,17 +63,28 @@ async def stream_task_updates(task_id: str, request: Request):
 @router.delete("/{task_id}")
 async def delete_task(task_id: str):
     """Delete a task by ID from the store"""
-    # Check if task exists
-    task = task_manager.get_task(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    try:
+        # Check if task exists
+        task = task_manager.get_task(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
 
-    # Remove the task from the store
-    removed_task = await task_manager.remove_task_from_store(task_id)
-    if removed_task:
-        return {"message": f"Task {task_id} deleted successfully"}
-    else:
-        raise HTTPException(status_code=500, detail="Failed to delete task")
+        # Remove the task from the store
+        removed_task = await task_manager.remove_task_from_store(task_id)
+        if removed_task:
+            return {"message": f"Task {task_id} deleted successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to delete task")
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        # Log unexpected errors and return a generic error
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.error(f"Unexpected error deleting task {task_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @router.post("/example_task")

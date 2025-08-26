@@ -14,3 +14,5 @@ class TaskUpdate(BaseModel):
     img: Optional[str] = None
     heading: Optional[str] = None
     body: Optional[str] = None
+    started_at: Optional[str] = None  # ISO format timestamp when task started
+    completed_at: Optional[str] = None  # ISO format timestamp when task completed

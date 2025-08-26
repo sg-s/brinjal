@@ -4,6 +4,7 @@ import asyncio
 from uuid import uuid4
 from .models import TaskUpdate
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,9 @@ class Task:
     heading: Optional[str] = None
     body: Optional[str] = None
     update_sleep_time: float = 0.05
+
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
 
     def progress_hook(self):
         """Optional progress hook. Use this to update the progress of the task."""
@@ -49,6 +53,8 @@ class Task:
             img=self.img,
             heading=self.heading,
             body=self.body,
+            started_at=self.started_at.isoformat() if self.started_at else None,
+            completed_at=self.completed_at.isoformat() if self.completed_at else None,
         )
 
         # Log the update for debugging
@@ -82,6 +88,10 @@ class Task:
 
         # Wait for the sync task to complete
         await sync_task
+
+        # Set completed_at if task was successful
+        if self.status == "done":
+            self.completed_at = datetime.now()
 
         # Send final status update
         await self.notify_update()

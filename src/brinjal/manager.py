@@ -85,6 +85,7 @@ class TaskManager:
             )
 
             task.status = "running"
+            task.started_at = datetime.now()
             await task.notify_update()
             self.task_store[task.task_id] = task
 
@@ -102,6 +103,12 @@ class TaskManager:
                 # Send final update for failed tasks
                 await task.notify_update()
             finally:
+                # Set completed_at if task was successful
+                if task.status == "done":
+                    task.completed_at = datetime.now()
+                    # Send final update with completed timestamp
+                    await self._send_final_task_update(task)
+
                 # Don't send additional updates - let the task handle its own status
                 # The task should have already set its final status and sent the final update
                 logger.info(f"Task {task.task_id} finished with status {task.status}")
@@ -146,6 +153,12 @@ class TaskManager:
                     "img": getattr(task, "img", None),
                     "heading": getattr(task, "heading", None),
                     "body": getattr(task, "body", None),
+                    "started_at": task.started_at.isoformat()
+                    if task.started_at
+                    else None,
+                    "completed_at": task.completed_at.isoformat()
+                    if task.completed_at
+                    else None,
                 },
             }
         elif event_type == "task_removed":
@@ -154,13 +167,20 @@ class TaskManager:
             return
 
         # Send notification to all subscribers
-        for subscriber_id, queue in self.queue_subscribers.items():
+        # Create a copy of the subscribers to avoid modification during iteration
+        subscribers_to_notify = list(self.queue_subscribers.items())
+        failed_subscribers = []
+
+        for subscriber_id, queue in subscribers_to_notify:
             try:
                 await queue.put(notification)
             except Exception as e:
                 logger.error(f"Failed to notify subscriber {subscriber_id}: {e}")
-                # Remove failed subscriber
-                self.queue_subscribers.pop(subscriber_id, None)
+                failed_subscribers.append(subscriber_id)
+
+        # Remove failed subscribers after iteration
+        for subscriber_id in failed_subscribers:
+            self.queue_subscribers.pop(subscriber_id, None)
 
     def get_task(self, task_id: str) -> Optional[Task]:
         """Get a task by ID"""
@@ -168,13 +188,30 @@ class TaskManager:
 
     async def remove_task_from_store(self, task_id: str):
         """Remove a task from the store and notify queue subscribers"""
-        if task_id in self.task_store:
-            task = self.task_store.pop(task_id)
-            # Notify queue subscribers of removed task
-            await self._notify_queue_subscribers("task_removed", task_id=task_id)
-            logger.info(f"Task {task_id} removed from store")
-            return task
-        return None
+        try:
+            if task_id in self.task_store:
+                task = self.task_store.pop(task_id)
+                # Notify queue subscribers of removed task
+                try:
+                    await self._notify_queue_subscribers(
+                        "task_removed", task_id=task_id
+                    )
+                except Exception as e:
+                    # Log notification errors but don't fail the deletion
+                    logger.warning(
+                        f"Failed to notify subscribers of task removal {task_id}: {e}"
+                    )
+
+                logger.info(f"Task {task_id} removed from store")
+                return task
+            else:
+                logger.warning(f"Attempted to remove non-existent task {task_id}")
+                return None
+        except Exception as e:
+            logger.error(
+                f"Error removing task {task_id} from store: {e}", exc_info=True
+            )
+            raise
 
     def get_all_tasks(self) -> List[dict]:
         """Get all tasks with their status and progress"""
@@ -188,6 +225,10 @@ class TaskManager:
                 "img": getattr(task, "img", None),
                 "heading": getattr(task, "heading", None),
                 "body": getattr(task, "body", None),
+                "started_at": task.started_at.isoformat() if task.started_at else None,
+                "completed_at": task.completed_at.isoformat()
+                if task.completed_at
+                else None,
             }
             for task in self.task_store.values()
         ]
@@ -209,6 +250,10 @@ class TaskManager:
                 img=task.img,
                 heading=task.heading,
                 body=task.body,
+                started_at=task.started_at.isoformat() if task.started_at else None,
+                completed_at=task.completed_at.isoformat()
+                if task.completed_at
+                else None,
             )
 
             # Yield initial state
@@ -267,6 +312,38 @@ class TaskManager:
                 self.queue_subscribers.pop(subscriber_id, None)
 
         return event_generator
+
+    async def _send_final_task_update(self, task: Task):
+        """Send a final task update with the completed timestamp"""
+        try:
+            # Create a final update with the completed timestamp
+            final_update = TaskUpdate(
+                task_id=task.task_id,
+                parent_id=task.parent_id,
+                task_type=task.__class__.__name__,
+                status=task.status,
+                progress=task.progress,
+                img=task.img,
+                heading=task.heading,
+                body=task.body,
+                started_at=task.started_at.isoformat() if task.started_at else None,
+                completed_at=task.completed_at.isoformat()
+                if task.completed_at
+                else None,
+            )
+
+            logger.info(
+                f"Task {task.task_id} final update - status: {task.status}, completed_at: {task.completed_at}"
+            )
+            logger.info(f"Final update data: {final_update.model_dump()}")
+
+            # Put the final update on the task's update queue
+            await task.update_queue.put(final_update.model_dump())
+            logger.info(
+                f"Sent final update for task {task.task_id} with completed_at: {task.completed_at}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to send final update for task {task.task_id}: {e}")
 
     async def add_recurring_task(
         self,

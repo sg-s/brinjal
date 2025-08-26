@@ -109,6 +109,11 @@ class TaskList extends HTMLElement {
                                         </div>
                                     </div>
                                 </div>
+                                
+                                <div class="small text-muted">
+                                    <div>Started: ${task.started_at ? new Date(task.started_at).toLocaleString() : 'Not started yet'}</div>
+                                    <div>Completed: ${task.completed_at ? new Date(task.completed_at).toLocaleString() : 'Not completed yet'}</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -144,6 +149,11 @@ class TaskList extends HTMLElement {
                                 </div>
                             </div>
                         </div>
+                        
+                        <div class="small text-muted">
+                            <div>Started: ${task.started_at ? new Date(task.started_at).toLocaleString() : 'Not started yet'}</div>
+                            <div>Completed: ${task.completed_at ? new Date(task.completed_at).toLocaleString() : 'Not completed yet'}</div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -159,6 +169,7 @@ class TaskList extends HTMLElement {
 
     // Update an existing card with new task data
     updateTaskCard(task) {
+        console.log('Updating task card with data:', task);
         const card = this.querySelector(`#task-${task.task_id}`);
         if (!card) return;
         // Re-render the card body (simplest way)
@@ -177,11 +188,16 @@ class TaskList extends HTMLElement {
         const eventSource = new EventSource(url, { withCredentials: true });
         eventSource.onmessage = (event) => {
             const data = JSON.parse(event.data);
+            console.log(`SSE message for task ${task.task_id}:`, data);
             this.updateTaskCard(data);
-            // Close SSE if task is done or failed
-            if (data.status === "done" || data.status === "failed") {
+            // Close SSE if task is done/failed AND we have the completed timestamp
+            if ((data.status === "done" || data.status === "failed") && 
+                (data.status === "failed" || data.completed_at)) {
+                console.log(`Closing SSE connection for task ${task.task_id} - status: ${data.status}, completed_at: ${data.completed_at}`);
                 eventSource.close();
                 this.activeSSEConnections.delete(task.task_id);
+            } else if (data.status === "done" || data.status === "failed") {
+                console.log(`Task ${task.task_id} is done/failed but no completed_at yet - keeping connection open`);
             }
         };
         eventSource.onerror = (err) => {
