@@ -3,16 +3,16 @@
 import pytest
 import asyncio
 import time
-from brinjal.task import ExampleTask
+from brinjal.task import ExampleCPUTask
 
 
 class TestExampleTask:
-    """Test cases for ExampleTask class"""
+    """Test cases for ExampleCPUTask class"""
 
     @pytest.fixture
     def example_task(self):
-        """Create a fresh ExampleTask instance for each test with fast execution"""
-        task = ExampleTask()
+        """Create a fresh ExampleCPUTask instance for each test with fast execution"""
+        task = ExampleCPUTask()
         task.sleep_time = 0.01  # Use very fast execution for tests
         return task
 
@@ -20,7 +20,7 @@ class TestExampleTask:
         """Test ExampleTask initializes correctly"""
         assert example_task.task_id is not None
         assert len(example_task.task_id) > 0
-        assert example_task.status == "pending"
+        assert example_task.status == "queued"
         assert example_task.progress == 0
         assert example_task.results is None
         assert example_task.update_queue is not None
@@ -31,10 +31,10 @@ class TestExampleTask:
         assert example_task.sleep_time == 0.01
 
     def test_example_task_unique_ids(self):
-        """Test that each ExampleTask gets a unique ID"""
-        task1 = ExampleTask()
-        task2 = ExampleTask()
-        task3 = ExampleTask()
+        """Test that each ExampleCPUTask gets a unique ID"""
+        task1 = ExampleCPUTask()
+        task2 = ExampleCPUTask()
+        task3 = ExampleCPUTask()
 
         ids = {task1.task_id, task2.task_id, task3.task_id}
         assert len(ids) == 3
@@ -59,7 +59,7 @@ class TestExampleTask:
     def test_example_task_progress_increments(self, example_task):
         """Test that progress increments during execution"""
         # Create a new task for this test to avoid interference
-        task = ExampleTask()
+        task = ExampleCPUTask()
         task.sleep_time = 0.01
 
         # Run the task and capture progress at key points
@@ -140,7 +140,7 @@ class TestExampleTask:
 
         # Verify update content
         assert update["task_id"] == example_task.task_id
-        assert update["task_type"] == "ExampleTask"
+        assert update["task_type"] == "ExampleCPUTask"
         assert update["status"] == "running"
         assert update["progress"] == 50
         assert update["heading"] == "Test Task"
@@ -155,7 +155,7 @@ class TestExampleTask:
 
         def run_task_in_thread():
             try:
-                task = ExampleTask()
+                task = ExampleCPUTask()
                 task.sleep_time = 0.01  # Fast execution for tests
                 task.run()
                 results.put(
@@ -202,7 +202,7 @@ class TestExampleTask:
             pass
 
         # Task should be in a reasonable state
-        assert example_task.status in ["pending", "running", "done"]
+        assert example_task.status in ["queued", "running", "done"]
 
     def test_example_task_attributes_modification(self, example_task):
         """Test that task attributes can be modified"""
@@ -230,7 +230,7 @@ class TestExampleTask:
     @pytest.mark.asyncio
     async def test_example_task_multiple_executions(self):
         """Test that the same task can be executed multiple times"""
-        task = ExampleTask()
+        task = ExampleCPUTask()
         task.sleep_time = 0.01  # Fast execution for tests
 
         # Execute first time
@@ -239,7 +239,7 @@ class TestExampleTask:
         assert task.progress == 100
 
         # Reset and execute again
-        task.status = "pending"
+        task.status = "queued"
         task.progress = 0
 
         await task.execute()
@@ -249,7 +249,7 @@ class TestExampleTask:
     def test_example_task_progress_consistency(self, example_task):
         """Test that progress values are consistent during execution"""
         # Create a new task for this test
-        task = ExampleTask()
+        task = ExampleCPUTask()
         task.sleep_time = 0.01
 
         # Run the task

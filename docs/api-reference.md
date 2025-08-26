@@ -1,338 +1,255 @@
 # API Reference
 
-This document provides a comprehensive reference for all Brinjal API endpoints, data models, and integration patterns.
-
 ## Overview
 
-Brinjal provides a generic task management system that can be integrated into any FastAPI application. The API is designed to be flexible and prefix-free, allowing you to control the URL structure in your application.
+The Brinjal API provides endpoints for managing tasks, monitoring progress, and streaming real-time updates. The system uses semaphore-based concurrency control to efficiently manage both CPU-bound and I/O-bound tasks.
 
-## Integration Patterns
+## Task Concurrency System
 
-### Basic Integration
+### Semaphore Types
 
-```python
-from fastapi import FastAPI
-from brinjal.api.router import router as brinjal_router
+Tasks can specify their concurrency behavior using the `semaphore_name` field:
 
-app = FastAPI()
+- **`"single"`**: Only one task can run at a time (CPU-bound tasks)
+- **`"multiple"`**: Up to 10 tasks can run concurrently (I/O-bound tasks)
+- **`"default"`**: Fallback with limit of 3 concurrent tasks
 
-# Include brinjal with your desired prefix
-app.include_router(brinjal_router, prefix="/api/tasks")
-```
+### Task Status Flow
 
-### Advanced Integration with Custom Endpoints
-
-```python
-from fastapi import APIRouter
-from brinjal.api.router import router as brinjal_router
-from brinjal.manager import task_manager
-
-# Create your main router with the desired prefix
-router = APIRouter(prefix="/api/tasks")
-
-# Include all of brinjal's functionality
-router.include_router(brinjal_router)
-
-# Add your custom endpoints
-@router.post("/custom_task")
-async def custom_task():
-    # Your custom logic here
-    pass
-
-# Include in your main app
-app.include_router(router)
-```
+1. **`queued`** - Task is in the queue, waiting to be picked up
+2. **`running`** - Task has acquired its semaphore and is executing
+3. **`done`** - Task completed successfully
+4. **`failed`** - Task encountered an error
 
 ## Endpoints
 
-### Task Management
+### Queue Management
 
-#### `GET /api/tasks/queue`
+#### GET `/queue`
 
-Returns all tasks in the system with their current status and progress.
+Returns all enqueued and running tasks with their status and progress.
 
 **Response:**
 ```json
 [
   {
-    "task_id": "550e8400-e29b-41d4-a716-446655440000",
+    "task_id": "uuid-string",
+    "parent_id": "uuid-string",
     "task_type": "ExampleTask",
     "status": "running",
-    "progress": 45,
-    "img": null,
-    "heading": null,
-    "body": null
+    "progress": 75,
+    "img": "icon.png",
+    "heading": "Task Title",
+    "body": "Task description",
+    "started_at": "2024-01-01T12:00:00",
+    "completed_at": null
   }
 ]
 ```
 
-#### `POST /api/tasks/example_task`
+#### GET `/queue/stream`
 
-Creates and starts a new example task.
+Streams real-time updates when tasks are added/removed from the queue using Server-Sent Events.
+
+**Events:**
+- `task_added`: New task added to queue
+- `task_removed`: Task removed from queue
+- `queue_updated`: Complete queue state update
+
+### Individual Task Management
+
+#### GET `/{task_id}/stream`
+
+Streams real-time updates for a specific task using Server-Sent Events.
+
+**Events:**
+- Task status changes
+- Progress updates
+- Completion notifications
+
+#### DELETE `/{task_id}`
+
+Deletes a task by ID from the store.
 
 **Response:**
 ```json
 {
-  "task_id": "550e8400-e29b-41d4-a716-446655440000"
+  "message": "Task {task_id} deleted successfully"
 }
 ```
 
-### Real-time Updates
+### Task Creation
 
-#### `GET /api/tasks/{task_id}/stream`
+#### POST `/example_cpu_task`
 
-Streams real-time updates for a specific task using Server-Sent Events (SSE).
+Creates and queues an example CPU-bound task (uses "single" semaphore).
 
-**Parameters:**
-- `task_id` (string): The unique identifier of the task
-
-**Response:** Server-Sent Events stream
-```
-data: {"task_id": "550e8400-e29b-41d4-a716-446655440000", "task_type": "ExampleTask", "status": "running", "progress": 0, "img": null, "heading": null, "body": null}
-
-data: {"task_id": "550e8400-e29b-41d4-a716-446655440000", "task_type": "ExampleTask", "status": "running", "progress": 10, "img": null, "heading": null, "body": null}
-
-data: {"task_id": "550e8400-e29b-41d4-a716-446655440000", "task_type": "ExampleTask", "status": "done", "progress": 100, "img": null, "heading": null, "body": null}
+**Response:**
+```json
+{
+  "task_id": "uuid-string"
+}
 ```
 
-### Static Files
+#### POST `/example_io_task`
 
-#### `GET /api/tasks/static/{file_path}`
+Creates and queues an example I/O-bound task (uses "multiple" semaphore).
 
-Serves static files from the brinjal package, including the TaskList web component.
-
-**Parameters:**
-- `file_path` (string): Path to the static file within the brinjal package
-
-**Available Files:**
-- `TaskList.js` - The TaskList web component
-- `test.html` - Test page for the TaskList component
-
-**Example:**
-```bash
-curl "http://localhost:8000/api/tasks/static/TaskList.js"
+**Response:**
+```json
+{
+  "task_id": "uuid-string"
+}
 ```
 
-### Testing
+## Task Models
 
-#### `GET /api/tasks/test`
+### Task Base Class
 
-Returns a test HTML page that demonstrates the TaskList component in action.
+```python
+@dataclass
+class Task:
+    task_id: str
+    parent_id: Optional[str]
+    status: str  # "queued", "running", "done", "failed"
+    progress: int  # 0-100
+    results: Optional[Any]
+    semaphore_name: str  # "single", "multiple", "default"
+    img: Optional[str]
+    heading: Optional[str]
+    body: Optional[str]
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+```
 
-**Response:** HTML page with embedded TaskList component
-
-## Data Models
-
-### TaskUpdate
-
-Generic model for task updates sent via SSE.
+### TaskUpdate Model
 
 ```python
 class TaskUpdate(BaseModel):
     task_id: str
+    parent_id: Optional[str]
     task_type: str
-    status: Literal["pending", "running", "done", "failed", "cancelled"] = "pending"
+    status: str
     progress: int
-    img: Optional[str] = None
-    heading: Optional[str] = None
-    body: Optional[str] = None
+    img: Optional[str]
+    heading: Optional[str]
+    body: Optional[str]
+    started_at: Optional[str]
+    completed_at: Optional[str]
 ```
 
-**Fields:**
-- `task_id`: Unique identifier for the task
-- `task_type`: Class name of the task (e.g., "ExampleTask")
-- `status`: Current status of the task
-- `progress`: Progress percentage (0-100)
-- `img`: Optional image URL for the task
-- `heading`: Optional title/heading for the task
-- `body`: Optional description text for the task
+## Concurrency Behavior
 
-## Task Manager
+### Single Semaphore Tasks
 
-### Global Instance
+- **Limit**: 1 concurrent execution
+- **Use Case**: CPU-bound tasks, heavy computation
+- **Behavior**: Tasks queue up and execute one at a time
+- **Example**: `ExampleCPUTask` (simulates CPU work)
 
-Brinjal provides a global task manager instance that you can use directly:
+### Multiple Semaphore Tasks
 
-```python
-from brinjal.manager import task_manager
+- **Limit**: 10 concurrent executions
+- **Use Case**: I/O-bound tasks, network requests, file operations
+- **Behavior**: Multiple tasks can run simultaneously
+- **Example**: `ExampleIOTask` (simulates I/O work)
 
-# Start the worker loop
-await task_manager.start()
+### Default Semaphore Tasks
 
-# Add a task
-task = ExampleTask()
-task_id = await task_manager.add_task_to_queue(task)
+- **Limit**: 3 concurrent executions
+- **Use Case**: Unknown workload types, fallback option
+- **Behavior**: Moderate concurrency for mixed workloads
 
-# Get task information
-task = task_manager.get_task(task_id)
-all_tasks = task_manager.get_all_tasks()
+## Real-Time Updates
 
-# Stop the worker loop
-await task_manager.stop()
+### Server-Sent Events (SSE)
+
+All streaming endpoints use SSE for real-time updates:
+
+```
+data: {"type": "task_added", "task": {...}}
+
+data: {"type": "progress_update", "task_id": "...", "progress": 50}
+
+data: {"type": "task_completed", "task_id": "...", "status": "done"}
 ```
 
-### Custom Instance
+### Event Types
 
-You can also create custom task manager instances:
-
-```python
-from brinjal.manager import TaskManager
-
-# Create a custom instance
-custom_manager = TaskManager()
-
-# Start the worker loop
-await custom_manager.start()
-
-# Use the custom instance
-task_id = await custom_manager.add_task_to_queue(task)
-```
+- **Task Lifecycle**: `task_added`, `task_started`, `task_completed`, `task_failed`
+- **Progress Updates**: `progress_update`
+- **Queue Changes**: `queue_updated`
 
 ## Error Handling
 
 ### HTTP Status Codes
 
-- `200 OK`: Request successful
-- `404 Not Found`: Task or file not found
-- `403 Forbidden`: Access denied (for static file security)
-- `500 Internal Server Error`: Server error
+- **200**: Success
+- **404**: Task not found
+- **500**: Internal server error
 
 ### Error Response Format
 
 ```json
 {
-  "detail": "Task not found"
+  "detail": "Error description"
 }
 ```
 
-## Security Considerations
+## Performance Considerations
 
-### Static File Access
+### Concurrency Limits
 
-The static file endpoint includes security checks to prevent directory traversal attacks:
+- **Single tasks**: May queue up under high load
+- **Multiple tasks**: Can overwhelm external systems
+- **Default tasks**: Balanced approach for mixed workloads
 
-- Files must be within the brinjal package's static directory
-- Relative paths are resolved and validated
-- Access outside the static directory is denied
+### Monitoring
 
-### Task Isolation
-
-- Each task runs in its own context
-- Tasks cannot access other tasks' data
-- Progress updates are isolated per task
-
-## Performance
-
-### Task Execution
-
-- Tasks run asynchronously using asyncio
-- Long-running operations use `asyncio.to_thread` to avoid blocking
-- Progress updates are batched to prevent overwhelming the client
-
-### SSE Optimization
-
-- Server-Sent Events are streamed efficiently
-- Connection state is monitored for disconnections
-- Unused connections are cleaned up automatically
-
-## Monitoring and Debugging
-
-### Logging
-
-Brinjal uses Python's standard logging module:
-
-```python
-import logging
-
-# Enable debug logging
-logging.basicConfig(level=logging.DEBUG)
-```
-
-### Health Checks
-
-Monitor the task manager status:
-
-```python
-from brinjal.manager import task_manager
-
-# Check if worker loop is running
-is_running = task_manager._worker_task is not None and not task_manager._worker_task.done()
-
-# Get queue size
-queue_size = task_manager.task_queue.qsize()
-```
+- Check `/queue` endpoint for current task status
+- Use SSE streams for real-time monitoring
+- Monitor semaphore acquisition in logs
 
 ## Examples
 
-### Complete Integration Example
+### Creating a CPU-Bound Task
 
 ```python
-from fastapi import FastAPI
-from brinjal.api.router import router as brinjal_router
-from brinjal.manager import task_manager
+import requests
 
-app = FastAPI(title="My Task App")
+# Create CPU-intensive task
+response = requests.post("http://localhost:8000/api/tasks/example_cpu_task")
+task_id = response.json()["task_id"]
 
-# Include brinjal
-app.include_router(brinjal_router, prefix="/api/tasks")
-
-@app.on_event("startup")
-async def startup():
-    await task_manager.start()
-
-@app.on_event("shutdown")
-async def shutdown():
-    await task_manager.stop()
-
-# Your custom endpoints here
-@app.post("/api/tasks/custom")
-async def custom_endpoint():
-    # Your logic here
-    pass
+# Monitor progress
+import sseclient
+client = sseclient.SSEClient(f"http://localhost:8000/api/tasks/{task_id}/stream")
+for event in client.events():
+    data = json.loads(event.data)
+    print(f"Progress: {data['progress']}%")
+    if data['status'] in ['done', 'failed']:
+        break
 ```
 
-### Frontend Integration Example
+### Creating an I/O-Bound Task
 
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container">
-        <h1>My Task Dashboard</h1>
-        
-        <!-- Load the TaskList component -->
-        <script src="/api/tasks/static/TaskList.js"></script>
-        
-        <!-- Use the component -->
-        <task-list base_url="https://myapp.com"></task-list>
-    </div>
-</body>
-</html>
+```python
+# Create I/O-intensive task
+response = requests.post("http://localhost:8000/api/tasks/example_io_task")
+task_id = response.json()["task_id"]
+
+# Monitor queue for all tasks
+client = sseclient.SSEClient("http://localhost:8000/api/tasks/queue/stream")
+for event in client.events():
+    data = json.loads(event.data)
+    if data['type'] == 'queue_updated':
+        print(f"Queue has {len(data['tasks'])} tasks")
 ```
 
-## Troubleshooting
+## Best Practices
 
-### Common Issues
-
-1. **Tasks not executing**: Ensure `task_manager.start()` is called
-2. **SSE not working**: Check that the task exists and the stream endpoint is accessible
-3. **Static files 404**: Verify the router is included with the correct prefix
-4. **Import errors**: Ensure brinjal is properly installed
-
-### Debug Steps
-
-1. Check application logs for errors
-2. Verify endpoint accessibility with curl
-3. Test SSE streaming manually
-4. Check browser console for JavaScript errors
-
-## Support
-
-For additional help:
-
-- **Documentation**: [docs.brinjal.dev](https://docs.brinjal.dev)
-- **Issues**: [GitHub Issues](https://github.com/sg-s/brinjal/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/sg-s/brinjal/discussions)
+1. **Choose appropriate semaphores** based on task characteristics
+2. **Monitor task progress** using SSE streams
+3. **Handle errors gracefully** in your client code
+4. **Clean up resources** when tasks complete
+5. **Use appropriate timeouts** for long-running operations

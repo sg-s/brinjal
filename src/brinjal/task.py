@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Any
 import asyncio
 from uuid import uuid4
-from .models import TaskUpdate
+from .models import TaskUpdate, TASK_STATES
 import logging
 from datetime import datetime
 
@@ -15,7 +15,7 @@ class Task:
 
     task_id: str = field(default_factory=lambda: str(uuid4()))
     parent_id: Optional[str] = None  # What started this task
-    status: str = "pending"
+    status: TASK_STATES = "queued"
     progress: int = 0
     results: Optional[Any] = None
     update_queue: asyncio.Queue = field(default_factory=asyncio.Queue)
@@ -27,6 +27,8 @@ class Task:
 
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+
+    semaphore_name: str = "default"
 
     def progress_hook(self):
         """Optional progress hook. Use this to update the progress of the task."""
@@ -104,11 +106,14 @@ class Task:
 
 
 @dataclass
-class ExampleTask(Task):
-    """Example task that demonstrates proper task execution and updates"""
+class ExampleCPUTask(Task):
+    """Example task that demonstrates proper task execution and updates.
+    This mimics a CPU-bound task. Only one can run at a time,
+    because it uses the 'single' semaphore."""
 
     sleep_time: float = 0.1
     update_sleep_time: float = 0.05  # Update every 50ms
+    semaphore_name: str = "single"  # CPU-bound task - only one can run at a time
 
     def run(self):
         """Synchronous function that does the actual work"""
@@ -127,12 +132,13 @@ class ExampleTask(Task):
 
 
 @dataclass
-class ProgressHookExampleTask(Task):
-    """Example task that demonstrates proper task execution and updates with a progress hook"""
+class ExampleIOTask(Task):
+    """Example task that demonstrates proper task execution and updates with a progress hook. This task is I/O-bound and can run concurrently."""
 
     sleep_time: float = 0.02
     progress_file: str = "task_progress.txt"
     update_sleep_time: float = 0.1  # Update every 100ms (slower updates)
+    semaphore_name: str = "multiple"  # I/O-bound task - multiple can run concurrently
 
     def progress_hook(self):
         """Progress hook that reads progress from a file and updates the task"""

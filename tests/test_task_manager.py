@@ -5,7 +5,7 @@ import pytest_asyncio
 import asyncio
 from unittest.mock import Mock, AsyncMock
 from brinjal.manager import TaskManager
-from brinjal.task import ExampleTask
+from brinjal.task import ExampleCPUTask
 
 
 class TestTaskManager:
@@ -26,8 +26,8 @@ class TestTaskManager:
 
     @pytest.fixture
     def example_task(self):
-        """Create an ExampleTask instance with fast execution"""
-        task = ExampleTask()
+        """Create an ExampleCPUTask instance with fast execution"""
+        task = ExampleCPUTask()
         task.sleep_time = 0.01  # Use very fast execution for tests
         return task
 
@@ -66,7 +66,7 @@ class TestTaskManager:
         """Test adding a task to the queue"""
         await task_manager.start()
 
-        task = ExampleTask()
+        task = ExampleCPUTask()
         task.sleep_time = 0.01  # Fast execution for tests
         task_id = await task_manager.add_task_to_queue(task)
 
@@ -79,7 +79,7 @@ class TestTaskManager:
         """Test retrieving a task by ID"""
         await task_manager.start()
 
-        task = ExampleTask()
+        task = ExampleCPUTask()
         task.sleep_time = 0.01  # Fast execution for tests
         await task_manager.add_task_to_queue(task)
 
@@ -99,9 +99,9 @@ class TestTaskManager:
         await task_manager.start()
 
         # Add multiple tasks
-        task1 = ExampleTask()
+        task1 = ExampleCPUTask()
         task1.sleep_time = 0.01  # Fast execution for tests
-        task2 = ExampleTask()
+        task2 = ExampleCPUTask()
         task2.sleep_time = 0.01  # Fast execution for tests
         await task_manager.add_task_to_queue(task1)
         await task_manager.add_task_to_queue(task2)
@@ -118,7 +118,7 @@ class TestTaskManager:
         """Test complete task execution lifecycle"""
         await task_manager.start()
 
-        task = ExampleTask()
+        task = ExampleCPUTask()
         task.sleep_time = 0.01  # Fast execution for tests
         task_id = await task_manager.add_task_to_queue(task)
 
@@ -146,7 +146,7 @@ class TestTaskManager:
         await task_manager.start()
 
         # Create and add multiple tasks
-        tasks = [ExampleTask() for _ in range(3)]
+        tasks = [ExampleCPUTask() for _ in range(3)]
         for task in tasks:
             task.sleep_time = 0.01  # Fast execution for tests
 
@@ -183,7 +183,7 @@ class TestTaskManager:
         """Test SSE event generator creation"""
         await task_manager.start()
 
-        task = ExampleTask()
+        task = ExampleCPUTask()
         task.sleep_time = 0.01  # Fast execution for tests
         await task_manager.add_task_to_queue(task)
 
@@ -217,7 +217,7 @@ class TestTaskManager:
         await task_manager.start()
 
         # Create a task that will take some time
-        task = ExampleTask()
+        task = ExampleCPUTask()
         task.sleep_time = 0.01  # Fast execution for tests
         await task_manager.add_task_to_queue(task)
 
@@ -237,11 +237,11 @@ class TestTaskManager:
         await task_manager.start()
 
         # Add multiple tasks
-        task1 = ExampleTask()
+        task1 = ExampleCPUTask()
         task1.sleep_time = 0.01  # Fast execution for tests
-        task2 = ExampleTask()
+        task2 = ExampleCPUTask()
         task2.sleep_time = 0.01  # Fast execution for tests
-        task3 = ExampleTask()
+        task3 = ExampleCPUTask()
         task3.sleep_time = 0.01  # Fast execution for tests
 
         await task_manager.add_task_to_queue(task1)
@@ -261,7 +261,7 @@ class TestTaskManager:
 
         # Create tasks concurrently
         async def create_task():
-            task = ExampleTask()
+            task = ExampleCPUTask()
             task.sleep_time = 0.01  # Fast execution for tests
             return await task_manager.add_task_to_queue(task)
 
@@ -297,7 +297,7 @@ class TestTaskManager:
         """Test that task progress updates are tracked"""
         await task_manager.start()
 
-        task = ExampleTask()
+        task = ExampleCPUTask()
         task.sleep_time = 0.01  # Fast execution for tests
         await task_manager.add_task_to_queue(task)
 

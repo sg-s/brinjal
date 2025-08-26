@@ -41,28 +41,44 @@ class TaskManager:
         self.task_queue = asyncio.Queue()
         self.task_store = {}
         self.recurring_tasks: Dict[str, RecurringTaskInfo] = {}
-        self._worker_task = None
+        self._worker_tasks = []  # List of worker tasks instead of single worker
         self._recurring_task = None
         self.loop = None
         # Queue SSE subscribers - map subscriber_id to notification queue
         self.queue_subscribers = {}
 
+        # Semaphore management for concurrency control
+        self.semaphores = {
+            "single": asyncio.Semaphore(1),  # Only 1 CPU-bound task at a time
+            "multiple": asyncio.Semaphore(10),  # Up to 10 I/O-bound tasks
+            "default": asyncio.Semaphore(3),  # Default fallback limit
+        }
+
+        # Worker pool configuration
+        self.max_workers = 20  # Maximum number of worker tasks
+
     async def start(self):  # this needs to be async
-        """Start the worker loop"""
-        if self._worker_task is None:
+        """Start the worker loops"""
+        if not self._worker_tasks:  # Only start if no workers are running
             self.loop = asyncio.get_running_loop()
-            self._worker_task = asyncio.create_task(self._worker_loop())
+
+            # Create multiple worker tasks
+            for i in range(self.max_workers):
+                worker_task = asyncio.create_task(self._worker_loop(f"worker-{i}"))
+                self._worker_tasks.append(worker_task)
+
             self._recurring_task = asyncio.create_task(self._recurring_scheduler())
 
     async def stop(self):
-        """Stop the worker loop"""
-        if self._worker_task:
-            self._worker_task.cancel()
-            try:
-                await self._worker_task
-            except asyncio.CancelledError:
-                self._worker_task = None
-                raise
+        """Stop the worker loops"""
+        # Stop all worker tasks
+        if self._worker_tasks:
+            for worker_task in self._worker_tasks:
+                worker_task.cancel()
+
+            # Wait for all workers to complete
+            await asyncio.gather(*self._worker_tasks, return_exceptions=True)
+            self._worker_tasks.clear()
 
         if self._recurring_task:
             self._recurring_task.cancel()
@@ -72,47 +88,81 @@ class TaskManager:
                 self._recurring_task = None
                 raise
 
-    async def _worker_loop(self):
+    async def _worker_loop(self, worker_id: str):
         """Background worker that processes tasks"""
-        logger.info("Worker loop started")
+        logger.info(f"Worker {worker_id} started")
         while True:
-            logger.info("Worker waiting for next task...")
-
-            # pick up a task from queue
-            task: Task = await self.task_queue.get()
-            logger.info(
-                f"Worker picked up task {task.task_id} ({task.__class__.__name__})"
-            )
-
-            task.status = "running"
-            task.started_at = datetime.now()
-            await task.notify_update()
-            self.task_store[task.task_id] = task
-
             try:
-                logger.info(f"Worker executing task {task.task_id}")
-                await task.execute()
-                # Don't override status here - let the task set its own final status
-                logger.info(f"Task {task.task_id} completed successfully")
+                logger.info(f"Worker {worker_id} waiting for next task...")
+
+                # pick up a task from queue
+                task: Task = await self.task_queue.get()
+                logger.info(
+                    f"Worker {worker_id} picked up task {task.task_id} ({task.__class__.__name__})"
+                )
+
+                # Get the appropriate semaphore for this task
+                semaphore = self.semaphores.get(
+                    task.semaphore_name, self.semaphores["default"]
+                )
+
+                # Acquire the semaphore before executing the task
+                logger.info(
+                    f"Worker {worker_id} acquiring semaphore '{task.semaphore_name}' for task {task.task_id}"
+                )
+                async with semaphore:
+                    logger.info(
+                        f"Worker {worker_id} acquired semaphore '{task.semaphore_name}' for task {task.task_id}"
+                    )
+
+                    # Update task status to running and acquire semaphore
+                    task.status = "running"
+                    task.started_at = datetime.now()
+                    await task.notify_update()
+                    self.task_store[task.task_id] = task
+
+                    try:
+                        logger.info(f"Worker {worker_id} executing task {task.task_id}")
+                        await task.execute()
+                        # Don't override status here - let the task set its own final status
+                        logger.info(
+                            f"Worker {worker_id} completed task {task.task_id} successfully"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Worker {worker_id} failed task {task.task_id} with error: {str(e)}",
+                            exc_info=True,
+                        )
+                        task.status = "failed"
+                        task.results = str(e)
+                        # Send final update for failed tasks
+                        await task.notify_update()
+                    finally:
+                        # Set completed_at if task was successful
+                        if task.status == "done":
+                            task.completed_at = datetime.now()
+                            # Send final update with completed timestamp
+                            await self._send_final_task_update(task)
+
+                        # Don't send additional updates - let the task handle its own status
+                        # The task should have already set its final status and sent the final update
+                        logger.info(
+                            f"Worker {worker_id} finished task {task.task_id} with status {task.status}"
+                        )
+                        self.task_queue.task_done()
+
+                        logger.info(
+                            f"Worker {worker_id} released semaphore '{task.semaphore_name}' for task {task.task_id}"
+                        )
+            except asyncio.CancelledError:
+                logger.info(f"Worker {worker_id} cancelled")
+                break
             except Exception as e:
                 logger.error(
-                    f"Task {task.task_id} failed with error: {str(e)}", exc_info=True
+                    f"Worker {worker_id} encountered error: {e}", exc_info=True
                 )
-                task.status = "failed"
-                task.results = str(e)
-                # Send final update for failed tasks
-                await task.notify_update()
-            finally:
-                # Set completed_at if task was successful
-                if task.status == "done":
-                    task.completed_at = datetime.now()
-                    # Send final update with completed timestamp
-                    await self._send_final_task_update(task)
-
-                # Don't send additional updates - let the task handle its own status
-                # The task should have already set its final status and sent the final update
-                logger.info(f"Task {task.task_id} finished with status {task.status}")
-                self.task_queue.task_done()
+                # Continue processing other tasks
+                continue
 
     async def add_task_to_queue(self, task: Task) -> str:
         """Add a task to the queue and return the task ID"""
@@ -122,6 +172,9 @@ class TaskManager:
 
         # Set the loop reference for the task
         task.loop = self.loop
+
+        # Set initial status to queued
+        task.status = "queued"
 
         # put the task on the queue
         await self.task_queue.put(task)
@@ -270,7 +323,7 @@ class TaskManager:
                     yield f"data: {json.dumps(update)}\n\n"
 
                     # If the task is done or failed, break and end the stream
-                    if update["status"] in ("done", "failed", "cancelled"):
+                    if update["status"] in ("done", "failed"):
                         break
                 except asyncio.TimeoutError:
                     # Send keepalive

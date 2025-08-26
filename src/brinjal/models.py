@@ -2,6 +2,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel
 
+TASK_STATES = Literal["queued", "running", "done", "failed"]
+
 
 class TaskUpdate(BaseModel):
     """Base model for task updates"""
@@ -9,7 +11,7 @@ class TaskUpdate(BaseModel):
     task_id: str
     parent_id: Optional[str] = None  # What started this task
     task_type: str
-    status: Literal["pending", "running", "done", "failed", "cancelled"] = "pending"
+    status: TASK_STATES = "queued"
     progress: int
     img: Optional[str] = None
     heading: Optional[str] = None

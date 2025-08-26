@@ -55,7 +55,7 @@ class TaskList extends HTMLElement {
         } else if (task.status === 'failed') {
             cardClass += ' border-danger';
             badgeClass = 'danger';
-        } else if (task.status === 'pending') {
+        } else if (task.status === 'queued') {
             cardClass += ' border-warning';
             badgeClass = 'warning';
         }
@@ -90,7 +90,7 @@ class TaskList extends HTMLElement {
                                     </div>
                                     <span class="badge bg-${badgeClass} me-2">${task.status.toUpperCase()}</span>
                                     <span class="badge bg-info">${taskTypeDisplay}</span>
-                                    ${task.status === 'done' || task.status === 'failed' || task.status === 'cancelled' ? 
+                                    ${task.status === 'done' || task.status === 'failed' ? 
                                         `<button class="btn btn-sm btn-outline-danger ms-2" onclick="document.querySelector('#task-${task.task_id}').deleteTask('${task.task_id}')">
                                             <i class="bi bi-trash"></i>
                                         </button>` : ''
@@ -130,7 +130,7 @@ class TaskList extends HTMLElement {
                             </div>
                             <span class="badge bg-${badgeClass} me-2">${task.status.toUpperCase()}</span>
                             <span class="badge bg-info">${taskTypeDisplay}</span>
-                            ${task.status === 'done' || task.status === 'failed' || task.status === 'cancelled' ? 
+                            ${task.status === 'done' || task.status === 'failed' ? 
                                 `<button class="btn btn-sm btn-outline-danger ms-2" onclick="document.querySelector('#task-${task.task_id}').deleteTask('${task.task_id}')">
                                     <i class="bi bi-trash"></i>
                                 </button>` : ''

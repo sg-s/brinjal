@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
 from ..manager import task_manager
 
-from ..task import ExampleTask, ProgressHookExampleTask
+from ..task import ExampleCPUTask, ExampleIOTask
 
 from pathlib import Path
 
@@ -87,24 +87,24 @@ async def delete_task(task_id: str):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@router.post("/example_task")
+@router.post("/example_cpu_task")
 async def example_task():
     """example task that does nothing"""
 
     # Create the example task
-    task = ExampleTask()
+    task = ExampleCPUTask()
 
     # Add to queue
     task_id = await task_manager.add_task_to_queue(task)
     return {"task_id": task_id}
 
 
-@router.post("/progress_hook_example_task")
+@router.post("/example_io_task")
 async def progress_hook_example_task():
     """example task that does nothing"""
 
     # Create the example task
-    task = ProgressHookExampleTask()
+    task = ExampleIOTask()
 
     # Add to queue
     task_id = await task_manager.add_task_to_queue(task)

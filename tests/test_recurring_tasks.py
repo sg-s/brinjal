@@ -5,7 +5,7 @@ import asyncio
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch, AsyncMock
 
-from brinjal.task import Task, ExampleTask
+from brinjal.task import Task, ExampleCPUTask
 from brinjal.manager import TaskManager, RecurringTaskInfo
 
 
@@ -14,7 +14,7 @@ class TestRecurringTaskInfo:
 
     def test_recurring_task_info_creation(self):
         """Test creating a RecurringTaskInfo instance"""
-        template_task = ExampleTask()
+        template_task = ExampleCPUTask()
         recurring_info = RecurringTaskInfo(
             cron_expression="*/5 * * * *", template_task=template_task, max_concurrent=2
         )
@@ -41,7 +41,7 @@ class TestTaskManagerRecurringTasks:
     @pytest.fixture
     def example_task(self):
         """Create an example task for testing"""
-        return ExampleTask(sleep_time=0.01)  # Fast for testing
+        return ExampleCPUTask(sleep_time=0.01)  # Fast for testing
 
     def test_add_recurring_task(self, task_manager, example_task):
         """Test adding a recurring task"""
@@ -213,11 +213,11 @@ class TestTaskParentRelationship:
     @pytest.fixture
     def example_task(self):
         """Create an example task for testing"""
-        return ExampleTask(sleep_time=0.01)
+        return ExampleCPUTask(sleep_time=0.01)
 
     def test_task_with_parent_id(self):
         """Test creating a task with a parent ID"""
-        task = ExampleTask(parent_id="parent-123")
+        task = ExampleCPUTask(parent_id="parent-123")
 
         assert task.parent_id == "parent-123"
         assert task.task_id is not None
@@ -225,7 +225,7 @@ class TestTaskParentRelationship:
 
     def test_task_without_parent_id(self):
         """Test creating a task without a parent ID"""
-        task = ExampleTask()
+        task = ExampleCPUTask()
 
         assert task.parent_id is None
         assert task.task_id is not None
