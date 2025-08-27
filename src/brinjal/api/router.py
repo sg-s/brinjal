@@ -1,12 +1,12 @@
 """Task routing endpoints"""
 
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
-from ..manager import task_manager
-
-from ..task import ExampleCPUTask, ExampleIOTask
-
 from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+
+from ..manager import task_manager
+from ..task import ExampleCPUTask, ExampleIOTask
 
 # Get the static directory path for serving files
 static_path = Path(__file__).parent / "static"

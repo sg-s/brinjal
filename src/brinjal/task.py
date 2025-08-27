@@ -1,10 +1,11 @@
-from dataclasses import dataclass, field
-from typing import Optional, Any
 import asyncio
-from uuid import uuid4
-from .models import TaskUpdate, TASK_STATES
 import logging
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any, Optional
+from uuid import uuid4
+
+from .models import TASK_STATES, TaskUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -153,8 +154,8 @@ class ExampleIOTask(Task):
 
     def run(self):
         """Synchronous function that writes progress to a file"""
-        import time
         import os
+        import time
 
         self.heading = "Progress Hook Example Task"
         self.body = "This is a progress hook example task. The progress is written to a file and read from it."

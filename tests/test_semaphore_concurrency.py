@@ -1,9 +1,11 @@
 """Tests for semaphore-based concurrency control"""
 
-import pytest
-import pytest_asyncio
 import asyncio
 import time
+
+import pytest
+import pytest_asyncio
+
 from brinjal.manager import TaskManager
 from brinjal.task import ExampleCPUTask, ExampleIOTask
 

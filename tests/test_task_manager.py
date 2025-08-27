@@ -1,9 +1,11 @@
 """Tests for TaskManager class"""
 
+import asyncio
+from unittest.mock import AsyncMock, Mock
+
 import pytest
 import pytest_asyncio
-import asyncio
-from unittest.mock import Mock, AsyncMock
+
 from brinjal.manager import TaskManager
 from brinjal.task import ExampleCPUTask
 

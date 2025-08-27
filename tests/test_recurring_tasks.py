@@ -1,12 +1,13 @@
 """Tests for recurring task functionality"""
 
-import pytest
 import asyncio
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 
-from brinjal.task import Task, ExampleCPUTask
-from brinjal.manager import TaskManager, RecurringTaskInfo
+import pytest
+
+from brinjal.manager import RecurringTaskInfo, TaskManager
+from brinjal.task import ExampleCPUTask, Task
 
 
 def test_recurring_task_info_creation():

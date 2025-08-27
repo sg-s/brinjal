@@ -1,10 +1,12 @@
 """Tests for ExampleTask class"""
 
-import pytest
 import asyncio
-import time
-import threading
 import queue
+import threading
+import time
+
+import pytest
+
 from brinjal.task import ExampleCPUTask
 
 
