@@ -96,7 +96,7 @@ omit = [
 
 [tool.interrogate]
 fail-under = 100
-exclude = ["setup.py", "docs", "build","tests","variables","conftest.py", "_version.py"]
+exclude = ["setup.py", "docs", "build","tests","variables","conftest.py", "src/brinjal/_version.py", "**/_version.py"]
 ignore-init-method = true
 ignore-init-module = true
 ignore-magic = true
