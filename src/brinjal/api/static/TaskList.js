@@ -9,6 +9,7 @@ class TaskList extends HTMLElement {
     init() {
         this.render();
         this.loadTasks();
+        this.startQueueSSEConnection();
     }
 
     render() {
@@ -54,7 +55,7 @@ class TaskList extends HTMLElement {
         } else if (task.status === 'failed') {
             cardClass += ' border-danger';
             badgeClass = 'danger';
-        } else if (task.status === 'pending') {
+        } else if (task.status === 'queued') {
             cardClass += ' border-warning';
             badgeClass = 'warning';
         }
@@ -89,6 +90,11 @@ class TaskList extends HTMLElement {
                                     </div>
                                     <span class="badge bg-${badgeClass} me-2">${task.status.toUpperCase()}</span>
                                     <span class="badge bg-info">${taskTypeDisplay}</span>
+                                    ${task.status === 'done' || task.status === 'failed' ? 
+                                        `<button class="btn btn-sm btn-outline-danger ms-2" onclick="document.querySelector('#task-${task.task_id}').deleteTask('${task.task_id}')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>` : ''
+                                    }
                                 </div>
                                 
                                 <h6 class="card-title mb-2">${title}</h6>
@@ -102,6 +108,11 @@ class TaskList extends HTMLElement {
                                             ${percentStr}
                                         </div>
                                     </div>
+                                </div>
+                                
+                                <div class="small text-muted">
+                                    <div>Started: ${task.started_at ? new Date(task.started_at).toLocaleString() : 'Not started yet'}</div>
+                                    <div>Completed: ${task.completed_at ? new Date(task.completed_at).toLocaleString() : 'Not completed yet'}</div>
                                 </div>
                             </div>
                         </div>
@@ -119,6 +130,11 @@ class TaskList extends HTMLElement {
                             </div>
                             <span class="badge bg-${badgeClass} me-2">${task.status.toUpperCase()}</span>
                             <span class="badge bg-info">${taskTypeDisplay}</span>
+                            ${task.status === 'done' || task.status === 'failed' ? 
+                                `<button class="btn btn-sm btn-outline-danger ms-2" onclick="document.querySelector('#task-${task.task_id}').deleteTask('${task.task_id}')">
+                                    <i class="bi bi-trash"></i>
+                                </button>` : ''
+                            }
                         </div>
                         
                         <h6 class="card-title mb-2">${title}</h6>
@@ -133,16 +149,27 @@ class TaskList extends HTMLElement {
                                 </div>
                             </div>
                         </div>
+                        
+                        <div class="small text-muted">
+                            <div>Started: ${task.started_at ? new Date(task.started_at).toLocaleString() : 'Not started yet'}</div>
+                            <div>Completed: ${task.completed_at ? new Date(task.completed_at).toLocaleString() : 'Not completed yet'}</div>
+                        </div>
                     </div>
                 </div>
             `;
         }
+        
+        // Add deleteTask method to the card element
+        card.deleteTask = (taskId) => {
+            this.deleteTask(taskId);
+        };
         
         return card;
     }
 
     // Update an existing card with new task data
     updateTaskCard(task) {
+        console.log('Updating task card with data:', task);
         const card = this.querySelector(`#task-${task.task_id}`);
         if (!card) return;
         // Re-render the card body (simplest way)
@@ -161,11 +188,16 @@ class TaskList extends HTMLElement {
         const eventSource = new EventSource(url, { withCredentials: true });
         eventSource.onmessage = (event) => {
             const data = JSON.parse(event.data);
+            console.log(`SSE message for task ${task.task_id}:`, data);
             this.updateTaskCard(data);
-            // Close SSE if task is done or failed
-            if (data.status === "done" || data.status === "failed") {
+            // Close SSE if task is done/failed AND we have the completed timestamp
+            if ((data.status === "done" || data.status === "failed") && 
+                (data.status === "failed" || data.completed_at)) {
+                console.log(`Closing SSE connection for task ${task.task_id} - status: ${data.status}, completed_at: ${data.completed_at}`);
                 eventSource.close();
                 this.activeSSEConnections.delete(task.task_id);
+            } else if (data.status === "done" || data.status === "failed") {
+                console.log(`Task ${task.task_id} is done/failed but no completed_at yet - keeping connection open`);
             }
         };
         eventSource.onerror = (err) => {
@@ -204,9 +236,107 @@ class TaskList extends HTMLElement {
         }
     }
 
+    // Start SSE connection for queue updates
+    startQueueSSEConnection() {
+        const url = `${this.baseUrl}/queue/stream`;
+        this.queueEventSource = new EventSource(url, { withCredentials: true });
+        
+        this.queueEventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            this.handleQueueUpdate(data);
+        };
+        
+        this.queueEventSource.onerror = (err) => {
+            console.error('Queue SSE error:', err);
+            // Attempt to reconnect after a delay
+            setTimeout(() => {
+                if (this.queueEventSource.readyState === EventSource.CLOSED) {
+                    this.startQueueSSEConnection();
+                }
+            }, 5000);
+        };
+    }
+
+    // Handle queue updates (new tasks, removed tasks, etc.)
+    handleQueueUpdate(data) {
+        if (data.type === 'task_added') {
+            // New task added to queue
+            const task = data.task;
+            
+            // Clear "No tasks found" message if it exists
+            this.updateNoTasksMessage();
+            
+            const card = this.renderTaskCard(task);
+            this.taskGrid.appendChild(card);
+            this.startSSEConnection(task);
+        } else if (data.type === 'task_removed') {
+            // Task removed from queue (completed, failed, etc.)
+            const taskId = data.task_id;
+            const card = this.querySelector(`#task-${taskId}`);
+            if (card) {
+                card.remove();
+                // Close the task's SSE connection if it exists
+                if (this.activeSSEConnections.has(taskId)) {
+                    this.activeSSEConnections.get(taskId).close();
+                    this.activeSSEConnections.delete(taskId);
+                }
+            }
+            
+            // Update "No tasks found" message if needed
+            this.updateNoTasksMessage();
+        } else if (data.type === 'queue_updated') {
+            // Full queue update - refresh the entire list
+            this.loadTasks();
+        }
+    }
+
+    // Helper method to update "No tasks found" message
+    updateNoTasksMessage() {
+        const hasTasks = this.taskGrid.children.length > 0;
+        const noTasksMessage = this.querySelector('.text-muted');
+        
+        if (!hasTasks && !noTasksMessage) {
+            // No tasks and no message - add the message
+            this.taskGrid.innerHTML = '<div class="col-12"><p class="text-muted">No tasks found</p></div>';
+        } else if (hasTasks && noTasksMessage && noTasksMessage.textContent === 'No tasks found') {
+            // Has tasks but still showing "No tasks found" - remove the message
+            noTasksMessage.remove();
+        }
+    }
+
     // Public method to refresh tasks
     refresh() {
         this.loadTasks();
+    }
+
+    // Delete a task by ID
+    async deleteTask(taskId) {
+        try {
+            const response = await fetch(`${this.baseUrl}/${taskId}`, {
+                method: 'DELETE',
+            });
+            
+            if (response.ok) {
+                // Task deleted successfully - remove from display
+                const card = this.querySelector(`#task-${taskId}`);
+                if (card) {
+                    card.remove();
+                    // Close the task's SSE connection if it exists
+                    if (this.activeSSEConnections.has(taskId)) {
+                        this.activeSSEConnections.get(taskId).close();
+                        this.activeSSEConnections.delete(taskId);
+                    }
+                    // Update "No tasks found" message if needed
+                    this.updateNoTasksMessage();
+                }
+            } else {
+                console.error('Failed to delete task:', response.statusText);
+                alert('Failed to delete task. Please try again.');
+            }
+        } catch (err) {
+            console.error('Error deleting task:', err);
+            alert('Error deleting task. Please try again.');
+        }
     }
 
     // Cleanup method
@@ -216,6 +346,11 @@ class TaskList extends HTMLElement {
             connection.close();
         }
         this.activeSSEConnections.clear();
+        
+        // Close queue SSE connection
+        if (this.queueEventSource) {
+            this.queueEventSource.close();
+        }
     }
 }
 

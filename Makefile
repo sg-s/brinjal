@@ -10,6 +10,7 @@ install:
 dev:
 	uv run uvicorn brinjal.main:app --host 0.0.0.0 --port 8000 --reload
 
+
 # Run all tests
 test:
 	uv run pytest

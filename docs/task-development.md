@@ -1,355 +1,217 @@
 # Task Development Guide
 
-This guide explains how to create custom tasks by extending the `Task` base class. You'll learn the fundamentals of task development and see practical examples.
+## Overview
 
-## Understanding the Task Base Class
+This guide explains how to create and manage tasks in the Brinjal task system. The system uses semaphore-based concurrency control to efficiently manage both CPU-bound and I/O-bound tasks.
 
-The `Task` class provides a foundation for all tasks in Brinjal. It handles:
+## Task Concurrency System
 
-- **Task lifecycle management** (pending → running → done/failed)
-- **Progress tracking** (0-100%)
-- **Real-time updates** via Server-Sent Events
-- **Asynchronous execution** coordination
-- **Metadata management** (img, heading, body)
+### Semaphore-Based Concurrency
 
-## Basic Task Structure
+Tasks use semaphores to control how many can run concurrently:
+
+- **`"single"` semaphore**: Only one task can run at a time (CPU-bound tasks)
+- **`"multiple"` semaphore**: Up to 10 tasks can run concurrently (I/O-bound tasks)  
+- **`"default"` semaphore**: Fallback with limit of 3 concurrent tasks
+
+### Task Status Flow
+
+1. **`queued`** - Task is in the queue, waiting to be picked up by a worker
+2. **`running`** - Task has acquired its semaphore and is executing
+3. **`done`** - Task completed successfully
+4. **`failed`** - Task encountered an error
+
+## Creating a Task
+
+### Basic Task Structure
 
 ```python
-from brinjal.task import Task
 from dataclasses import dataclass
+from .task import Task
 
 @dataclass
 class MyCustomTask(Task):
-    # Add your custom fields here
-    custom_param: str = ""
+    """Custom task that does specific work"""
+    
+    # Set concurrency type based on task characteristics
+    semaphore_name: str = "single"  # or "multiple" or "default"
     
     def run(self):
-        """Implement your synchronous work here"""
-        # Your task logic goes here
+        """Synchronous method that does the actual work"""
+        # Your task logic here
         pass
 ```
 
-## The `run()` Method
+### Choosing the Right Semaphore
 
-The `run()` method is where you implement your actual work. It should be **synchronous** because it runs in a separate thread to avoid blocking the event loop.
+- **Use `"single"` for CPU-bound tasks**:
+  - Heavy computation
+  - Data processing
+  - Machine learning inference
+  - Example: `ExampleCPUTask` (simulates CPU work)
 
-### Key Points About `run()`:
+- **Use `"multiple"` for I/O-bound tasks**:
+  - Network requests
+  - File operations
+  - Database queries
+  - External API calls
+  - Example: `ExampleIOTask` (simulates I/O work)
 
-1. **Must be synchronous** - No `async/await` keywords
-2. **Runs in a thread** - Use `asyncio.to_thread()` for I/O operations
-3. **Update progress** - Set `self.progress` to trigger updates
-4. **Set final status** - Use `self.status = "done"` or `"failed"`
-5. **Handle exceptions** - The base class will catch and mark as failed
+- **Use `"default"` for unknown or mixed workloads**:
+  - Fallback option
+  - Moderate concurrency (limit of 3)
 
-## Simple Example: Counter Task
-
-```python
-from brinjal.task import Task
-from dataclasses import dataclass
-import time
-
-@dataclass
-class CounterTask(Task):
-    count_to: int = 10
-    
-    def run(self):
-        """Count from 0 to count_to with progress updates"""
-        self.heading = f"Counting to {self.count_to}"
-        self.body = "Incrementing counter..."
-        
-        for i in range(self.count_to + 1):
-            self.progress = int((i / self.count_to) * 100)
-            time.sleep(0.5)  # Simulate work
-        
-        self.status = "done"
-        self.body = f"Counted to {self.count_to} successfully!"
-```
-
-## Advanced Example: File Processing Task
+### Task Configuration
 
 ```python
-from brinjal.task import Task
-from dataclasses import dataclass
-import os
-import time
-
 @dataclass
-class FileProcessingTask(Task):
-    file_path: str = ""
-    operation: str = "copy"  # copy, move, delete
+class MyTask(Task):
+    # Required fields (inherited from Task)
+    task_id: str = field(default_factory=lambda: str(uuid4()))
+    parent_id: Optional[str] = None
+    
+    # Concurrency control
+    semaphore_name: str = "multiple"  # Allow multiple concurrent executions
+    
+    # Progress tracking
+    progress: int = 0
+    update_sleep_time: float = 0.1  # How often to check for progress updates
+    
+    # UI display
+    img: Optional[str] = None
+    heading: Optional[str] = None
+    body: Optional[str] = None
     
     def run(self):
-        """Process a file with progress updates"""
-        if not os.path.exists(self.file_path):
-            self.status = "failed"
-            self.body = f"File not found: {self.file_path}"
-            return
+        """Implement your task logic here"""
+        # Set display information
+        self.heading = "My Custom Task"
+        self.body = "Processing data..."
         
-        file_size = os.path.getsize(self.file_path)
-        self.heading = f"{self.operation.title()} File"
-        self.body = f"Processing {os.path.basename(self.file_path)}"
-        
-        # Simulate file processing with progress
-        for i in range(101):
+        # Update progress as work progresses
+        for i in range(100):
             self.progress = i
+            # Do some work...
             time.sleep(0.1)
         
+        # Set final status
         self.status = "done"
-        self.body = f"File {self.operation} completed successfully"
+        self.body = "Task completed successfully!"
 ```
 
-## Working with External APIs
+## Progress Hooks
 
-When your task needs to make HTTP requests or use external services:
-
-```python
-from brinjal.task import Task
-from dataclasses import dataclass
-import requests
-import time
-
-@dataclass
-class APITask(Task):
-    url: str = ""
-    method: str = "GET"
-    
-    def run(self):
-        """Make API request with progress updates"""
-        self.heading = f"{self.method} Request"
-        self.body = f"Calling {self.url}"
-        
-        try:
-            # Simulate API call preparation
-            self.progress = 10
-            time.sleep(0.5)
-            
-            # Make the actual request
-            self.progress = 50
-            response = requests.request(self.method, self.url, timeout=30)
-            
-            # Process response
-            self.progress = 90
-            time.sleep(0.5)
-            
-            if response.status_code == 200:
-                self.status = "done"
-                self.body = f"API call successful: {response.status_code}"
-                self.results = response.json()
-            else:
-                self.status = "failed"
-                self.body = f"API call failed: {response.status_code}"
-                
-        except Exception as e:
-            self.status = "failed"
-            self.body = f"Error: {str(e)}"
-```
-
-## Database Operations
-
-For tasks that need database access:
+For tasks that need to read progress from external sources:
 
 ```python
-from brinjal.task import Task
-from dataclasses import dataclass
-import sqlite3
-import time
-
-@dataclass
-class DatabaseTask(Task):
-    query: str = ""
-    db_path: str = "database.db"
-    
-    def run(self):
-        """Execute database query with progress updates"""
-        self.heading = "Database Operation"
-        self.body = f"Executing: {self.query[:50]}..."
-        
-        try:
-            # Connect to database
-            self.progress = 20
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # Execute query
-            self.progress = 60
-            cursor.execute(self.query)
-            
-            # Commit changes
-            self.progress = 80
-            conn.commit()
-            
-            # Clean up
-            self.progress = 90
-            cursor.close()
-            conn.close()
-            
-            self.status = "done"
-            self.body = "Database operation completed successfully"
-            
-        except Exception as e:
-            self.status = "failed"
-            self.body = f"Database error: {str(e)}"
-```
-
-## Long-Running Tasks
-
-For tasks that take a long time, provide meaningful progress updates:
-
-```python
-from brinjal.task import Task
-from dataclasses import dataclass
-import time
-
-@dataclass
-class LongRunningTask(Task):
-    duration_seconds: int = 60
-    
-    def run(self):
-        """Long-running task with detailed progress"""
-        self.heading = "Long Running Process"
-        self.body = f"Running for {self.duration_seconds} seconds"
-        
-        start_time = time.time()
-        target_time = start_time + self.duration_seconds
-        
-        while time.time() < target_time:
-            elapsed = time.time() - start_time
-            progress = int((elapsed / self.duration_seconds) * 100)
-            
-            if progress != self.progress:
-                self.progress = progress
-                self.body = f"Elapsed: {elapsed:.1f}s / {self.duration_seconds}s"
-            
-            time.sleep(0.1)
-        
-        self.progress = 100
-        self.status = "done"
-        self.body = "Long running process completed!"
-```
-
-## Error Handling
-
-Always handle errors gracefully in your `run()` method:
-
-```python
-from brinjal.task import Task
-from dataclasses import dataclass
-import time
-
-@dataclass
-class RobustTask(Task):
-    operation: str = "default"
-    
-    def run(self):
-        """Task with comprehensive error handling"""
-        try:
-            self.heading = f"Robust {self.operation}"
-            self.body = "Starting operation..."
-            
-            # Simulate work
-            for i in range(10):
-                self.progress = i * 10
-                time.sleep(0.5)
-                
-                # Simulate potential failure
-                if i == 5 and self.operation == "risky":
-                    raise ValueError("Simulated failure at step 5")
-            
-            self.status = "done"
-            self.body = "Operation completed successfully"
-            
-        except Exception as e:
-            self.status = "failed"
-            self.body = f"Operation failed: {str(e)}"
-            # You can also set additional error details
-            self.results = {"error": str(e), "step": "unknown"}
+def progress_hook(self):
+    """Called periodically to update progress from external source"""
+    try:
+        # Read progress from file, API, etc.
+        with open("progress.txt", "r") as f:
+            self.progress = int(f.read().strip())
+    except Exception as e:
+        # Keep current progress if reading fails
+        pass
 ```
 
 ## Best Practices
 
-### 1. **Progress Updates**
-- Update progress frequently for long tasks
-- Use meaningful progress values (0-100)
-- Avoid overwhelming the update queue
+### 1. Choose Appropriate Concurrency
 
-### 2. **Status Management**
-- Always set final status (`done`, `failed`, or `cancelled`)
-- Provide meaningful error messages
-- Use `self.body` for detailed status information
+- **CPU-bound**: Use `"single"` to avoid overwhelming the system
+- **I/O-bound**: Use `"multiple"` to maximize throughput
+- **Unknown**: Use `"default"` as a safe middle ground
 
-### 3. **Resource Management**
-- Clean up resources in your `run()` method
-- Handle exceptions gracefully
-- Don't leave connections open
+### 2. Progress Updates
 
-### 4. **Performance**
-- Keep the `run()` method efficient
-- Use `time.sleep()` sparingly
-- Consider breaking long tasks into smaller steps
+- Update `self.progress` regularly during execution
+- Use `progress_hook()` for external progress sources
+- Set `update_sleep_time` based on how often progress changes
 
-### 5. **User Experience**
-- Provide clear headings and descriptions
-- Update progress meaningfully
-- Give helpful error messages
+### 3. Error Handling
+
+- Set `self.status = "failed"` on errors
+- Put error details in `self.results`
+- Clean up any temporary resources
+
+### 4. Resource Management
+
+- Release any acquired resources in finally blocks
+- Clean up temporary files
+- Close database connections
+
+## Example Tasks
+
+### CPU-Bound Task
+
+```python
+@dataclass
+class DataProcessingTask(Task):
+    semaphore_name: str = "single"  # CPU-intensive work
+    
+    def run(self):
+        self.heading = "Processing Data"
+        self.body = "Analyzing large dataset..."
+        
+        # Simulate CPU work
+        for i in range(100):
+            self.progress = i
+            # Do heavy computation
+            time.sleep(0.1)
+        
+        self.status = "done"
+        self.body = "Analysis complete!"
+```
+
+### I/O-Bound Task
+
+```python
+@dataclass
+class APITask(Task):
+    semaphore_name: str = "multiple"  # Network I/O
+    
+    def run(self):
+        self.heading = "API Request"
+        self.body = "Fetching data from external API..."
+        
+        # Simulate API call
+        time.sleep(0.5)
+        self.progress = 50
+        
+        # Process response
+        time.sleep(0.5)
+        self.progress = 100
+        
+        self.status = "done"
+        self.body = "Data fetched successfully!"
+```
 
 ## Testing Your Tasks
 
-### 1. **Create a Test Task**
-
-```python
-from brinjal.task import Task
-from dataclasses import dataclass
-import time
-
-@dataclass
-class TestTask(Task):
-    test_param: str = "test"
-    
-    def run(self):
-        """Test task for development"""
-        self.heading = "Test Task"
-        self.body = f"Testing with: {self.test_param}"
-        
-        for i in range(5):
-            self.progress = i * 20
-            time.sleep(1)
-        
-        self.status = "done"
-        self.body = "Test completed successfully"
-```
-
-### 2. **Test in Development**
+Use the provided test framework to verify your tasks work correctly:
 
 ```bash
-# Start the server
-make dev
+# Run all tests
+pytest tests/
 
-# Create your test task
-curl -X POST "http://localhost:8000/api/tasks/test_task" \
-  -H "Content-Type: application/json" \
-  -d '{"test_param": "hello world"}'
+# Run specific test file
+pytest tests/test_semaphore_concurrency.py
 
-# Monitor progress
-curl "http://localhost:8000/api/tasks/queue"
+# Run with verbose output
+pytest -v tests/
 ```
 
-## Next Steps
+## Monitoring and Debugging
 
-Now that you understand task development:
+- Check task status in the queue endpoint
+- Monitor semaphore acquisition in logs
+- Use SSE streams for real-time updates
+- Verify concurrency limits are respected
 
-1. [Explore the API reference](./api-reference.md) for more details
-2. [Learn about integration](./integration.md) in your projects
-3. [Check out examples](./examples.md) for more use cases
-4. [Understand the web component](./web-component.md) for displaying tasks
+## Performance Considerations
 
-## Summary
-
-Creating custom tasks in Brinjal is straightforward:
-
-1. **Inherit from `Task`** class
-2. **Implement the `run()` method** with your logic
-3. **Update progress** during execution
-4. **Set final status** when complete
-5. **Handle errors** gracefully
-
-The base class handles all the complexity of task management, progress tracking, and real-time updates. You focus on your business logic!
+- **Single semaphore tasks**: Will queue up if many are submitted
+- **Multiple semaphore tasks**: Can overwhelm external systems if not limited
+- **Default semaphore**: Good balance for mixed workloads
+- **Progress update frequency**: Balance between responsiveness and overhead

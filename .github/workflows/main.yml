@@ -37,11 +37,18 @@ jobs:
       - name: Check docstrings using interrogate
         run: |
           pip install interrogate 
-          if [ $(interrogate -c pyproject.toml -v . -f 100 | grep "FAILED" | wc -l) = 1 ]; then
-             echo "necessary docstrings missing:"
-             interrogate -vv . -f 100 
-             exit 1
-          fi
+          echo "Running interrogate with configuration from pyproject.toml..."
+          echo "Current directory: $(pwd)"
+          echo "Configuration file contents:"
+          cat pyproject.toml | grep -A 10 "\[tool.interrogate\]"
+          echo ""
+          echo "Running interrogate check..."
+          interrogate -c pyproject.toml -v . -f 100 || {
+            echo "Docstring check failed. Running with verbose output to see details:"
+            interrogate -vv . -f 100
+            exit 1
+          }
+          echo "Docstring check passed!"
 
 
 
@@ -53,24 +60,11 @@ jobs:
     strategy:
       matrix:
         python-version:
-          - "3.10"
-          - "3.11"
           - "3.12"
           - "3.13"
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Cache FFmpeg
-        id: cache-ffmpeg
-        uses: actions/cache@v4
-        with:
-          path: /usr/bin/ffmpeg
-          key: ffmpeg-${{ runner.os }}
-
-      - name: Install FFmpeg (if not cached)
-        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
 
       - name: Install uv

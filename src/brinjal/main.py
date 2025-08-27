@@ -1,6 +1,7 @@
 """Main FastAPI application for brinjal"""
 
 from fastapi import FastAPI
+
 from .api.router import router
 
 app = FastAPI(title="Brinjal", description="🍆 Brinjal task management system")

@@ -1,13 +1,12 @@
 """Task routing endpoints"""
 
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
-from ..manager import task_manager
-
-from ..task import ExampleTask, ProgressHookExampleTask
-
 from pathlib import Path
-import asyncio
+
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+
+from ..manager import task_manager
+from ..task import ExampleCPUTask, ExampleIOTask
 
 # Get the static directory path for serving files
 static_path = Path(__file__).parent / "static"
@@ -20,11 +19,13 @@ router = APIRouter(
 
 @router.on_event("startup")
 async def startup_event():
+    """Start the task manager on startup"""
     await task_manager.start()
 
 
 @router.on_event("shutdown")
 async def shutdown_event():
+    """Stop the task manager on shutdown"""
     await task_manager.stop()
 
 
@@ -32,6 +33,17 @@ async def shutdown_event():
 async def get_all_tasks():
     """Return all enqueued and running tasks with their status and progress."""
     return task_manager.get_all_tasks()
+
+
+@router.get("/queue/stream")
+async def stream_queue_updates(request: Request):
+    """Stream real-time updates when tasks are added/removed from the queue"""
+    # Get the event generator from the task manager for queue updates
+    event_generator = task_manager.get_queue_sse_event_generator(request)
+    if not event_generator:
+        raise HTTPException(status_code=404, detail="Queue stream not available")
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @router.get("/{task_id}/stream")
@@ -50,24 +62,53 @@ async def stream_task_updates(task_id: str, request: Request):
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-@router.post("/example_task")
+@router.delete("/{task_id}")
+async def delete_task(task_id: str):
+    """Delete a task by ID from the store"""
+    try:
+        # Check if task exists
+        task = task_manager.get_task(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        # Remove the task from the store
+        removed_task = await task_manager.remove_task_from_store(task_id)
+        if removed_task:
+            return {"message": f"Task {task_id} deleted successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to delete task")
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        # Log unexpected errors and return a generic error
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.error(f"Unexpected error deleting task {task_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Internal server error: {str(e)}"
+        ) from None
+
+
+@router.post("/example_cpu_task")
 async def example_task():
     """example task that does nothing"""
 
     # Create the example task
-    task = ExampleTask()
+    task = ExampleCPUTask()
 
     # Add to queue
     task_id = await task_manager.add_task_to_queue(task)
     return {"task_id": task_id}
 
 
-@router.post("/progress_hook_example_task")
+@router.post("/example_io_task")
 async def progress_hook_example_task():
     """example task that does nothing"""
 
     # Create the example task
-    task = ProgressHookExampleTask()
+    task = ExampleIOTask()
 
     # Add to queue
     task_id = await task_manager.add_task_to_queue(task)
