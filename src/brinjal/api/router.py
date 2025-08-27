@@ -19,11 +19,13 @@ router = APIRouter(
 
 @router.on_event("startup")
 async def startup_event():
+    """Start the task manager on startup"""
     await task_manager.start()
 
 
 @router.on_event("shutdown")
 async def shutdown_event():
+    """Stop the task manager on shutdown"""
     await task_manager.stop()
 
 
@@ -84,7 +86,9 @@ async def delete_task(task_id: str):
 
         logger = logging.getLogger(__name__)
         logger.error(f"Unexpected error deleting task {task_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Internal server error: {str(e)}"
+        ) from None
 
 
 @router.post("/example_cpu_task")

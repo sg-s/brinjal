@@ -1,3 +1,5 @@
+"""Types and models for the brinjal project."""
+
 from typing import Literal, Optional
 
 from pydantic import BaseModel
