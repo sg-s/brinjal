@@ -1,3 +1,5 @@
+"""Task base class and examples Tasks."""
+
 import asyncio
 import logging
 from dataclasses import dataclass, field

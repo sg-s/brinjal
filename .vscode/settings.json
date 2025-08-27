@@ -1,6 +1,13 @@
 {
     "cSpell.words": [
+        "asyncio",
+        "beartype",
         "brinjal",
-        "keepalive"
+        "conftest",
+        "Gorur",
+        "keepalive",
+        "mkdocstrings",
+        "Shandilya",
+        "uvicorn"
     ]
 }

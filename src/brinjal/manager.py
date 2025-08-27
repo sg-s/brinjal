@@ -90,6 +90,7 @@ class TaskManager:
 
     async def _worker_loop(self, worker_id: str):
         """Background worker that processes tasks"""
+
         logger.info(f"Worker {worker_id} started")
         while True:
             try:
@@ -288,11 +289,14 @@ class TaskManager:
 
     def get_sse_event_generator(self, task_id: str, request):
         """Get an SSE event generator for a specific task"""
+
         task = self.get_task(task_id)
         if not task:
             return None
 
         async def event_generator():
+            """Event generator for a specific task"""
+
             # Send initial state using TaskUpdate model
             initial_update = TaskUpdate(
                 task_id=task.task_id,
@@ -335,6 +339,8 @@ class TaskManager:
         """Get an SSE event generator for queue updates"""
 
         async def event_generator():
+            """Event generator for queue updates"""
+
             # Create a unique subscriber ID for this connection
             subscriber_id = id(request)
             self.queue_subscribers[subscriber_id] = asyncio.Queue()
@@ -368,6 +374,7 @@ class TaskManager:
 
     async def _send_final_task_update(self, task: Task):
         """Send a final task update with the completed timestamp"""
+
         try:
             # Create a final update with the completed timestamp
             final_update = TaskUpdate(
