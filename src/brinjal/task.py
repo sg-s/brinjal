@@ -80,13 +80,27 @@ class Task:
 
         # Monitor progress and send updates
         last_progress = 0
+        last_body = self.body
+        last_heading = self.heading
+        last_img = self.img
+        last_status = self.status
         while not sync_task.done():
             self.progress_hook()
 
             # Check if progress has changed
-            if self.progress != last_progress:
+            if (
+                self.progress != last_progress
+                or self.body != last_body
+                or self.heading != last_heading
+                or self.img != last_img
+                or self.status != last_status
+            ):
                 await self.notify_update()
                 last_progress = self.progress
+                last_body = self.body
+                last_heading = self.heading
+                last_img = self.img
+                last_status = self.status
 
             # Small delay to avoid overwhelming the update queue
             await asyncio.sleep(self.update_sleep_time)
