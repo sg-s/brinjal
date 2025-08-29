@@ -7,7 +7,7 @@ import pytest
 import pytest_asyncio
 
 from brinjal.manager import TaskManager
-from brinjal.task import ExampleCPUTask
+from brinjal.task import ExampleCPUTask, ExampleIOTask
 
 
 @pytest_asyncio.fixture
@@ -336,3 +336,135 @@ async def test_task_progress_updates(task_manager):
     assert len(progress_values) > 1
     assert 0 in progress_values  # Should start at 0
     assert 100 in progress_values  # Should end at 100
+
+
+@pytest.mark.asyncio
+async def test_search_tasks_by_attributes_empty_criteria(task_manager):
+    """Test search with empty criteria returns empty list"""
+    result = task_manager.search_tasks_by_attributes({})
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_search_tasks_by_attributes_no_matches(task_manager):
+    """Test search with no matching tasks returns empty list"""
+    result = task_manager.search_tasks_by_attributes({"name": "NonExistentTask"})
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_search_tasks_by_attributes_single_criteria(task_manager):
+    """Test search with single criteria"""
+    # Create tasks with different names
+    task1 = ExampleCPUTask(name="Task A")
+    task2 = ExampleCPUTask(name="Task B")
+    task3 = ExampleCPUTask(name="Task A")
+
+    task_manager.task_store[task1.task_id] = task1
+    task_manager.task_store[task2.task_id] = task2
+    task_manager.task_store[task3.task_id] = task3
+
+    # Search for tasks with name "Task A"
+    result = task_manager.search_tasks_by_attributes({"name": "Task A"})
+    assert len(result) == 2
+    assert task1.task_id in result
+    assert task3.task_id in result
+    assert task2.task_id not in result
+
+
+@pytest.mark.asyncio
+async def test_search_tasks_by_attributes_multiple_criteria(task_manager):
+    """Test search with multiple criteria (AND logic)"""
+    # Create tasks with different attributes
+    task1 = ExampleCPUTask(name="Task A", semaphore_name="single")
+    task2 = ExampleCPUTask(name="Task A", semaphore_name="multiple")
+    task3 = ExampleCPUTask(name="Task B", semaphore_name="single")
+
+    task_manager.task_store[task1.task_id] = task1
+    task_manager.task_store[task2.task_id] = task2
+    task_manager.task_store[task3.task_id] = task3
+
+    # Search for tasks with name "Task A" AND semaphore_name "single"
+    result = task_manager.search_tasks_by_attributes(
+        {"name": "Task A", "semaphore_name": "single"}
+    )
+    assert len(result) == 1
+    assert task1.task_id in result
+    assert task2.task_id not in result
+    assert task3.task_id not in result
+
+
+@pytest.mark.asyncio
+async def test_search_tasks_by_attributes_nonexistent_attribute(task_manager):
+    """Test search with non-existent attribute returns empty list"""
+    task = ExampleCPUTask()
+    task_manager.task_store[task.task_id] = task
+
+    # Search for non-existent attribute
+    result = task_manager.search_tasks_by_attributes({"nonexistent_attr": "value"})
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_search_tasks_by_attributes_task_type(task_manager):
+    """Test search by task_type (special case)"""
+    task1 = ExampleCPUTask()
+    task2 = ExampleIOTask()
+
+    task_manager.task_store[task1.task_id] = task1
+    task_manager.task_store[task2.task_id] = task2
+
+    # Search for ExampleCPUTask
+    result = task_manager.search_tasks_by_attributes({"task_type": "ExampleCPUTask"})
+    assert len(result) == 1
+    assert task1.task_id in result
+    assert task2.task_id not in result
+
+    # Search for ExampleIOTask
+    result = task_manager.search_tasks_by_attributes({"task_type": "ExampleIOTask"})
+    assert len(result) == 1
+    assert task2.task_id in result
+    assert task1.task_id not in result
+
+
+@pytest.mark.asyncio
+async def test_search_tasks_by_attributes_task_type_with_other_criteria(task_manager):
+    """Test search by task_type combined with other criteria"""
+    task1 = ExampleCPUTask(name="CPU Task", semaphore_name="single")
+    task2 = ExampleCPUTask(name="Another CPU Task", semaphore_name="single")
+    task3 = ExampleIOTask(semaphore_name="multiple")
+
+    task_manager.task_store[task1.task_id] = task1
+    task_manager.task_store[task2.task_id] = task2
+    task_manager.task_store[task3.task_id] = task3
+
+    # Search for ExampleCPUTask with semaphore_name "single"
+    result = task_manager.search_tasks_by_attributes(
+        {"task_type": "ExampleCPUTask", "semaphore_name": "single"}
+    )
+    assert len(result) == 2
+    assert task1.task_id in result
+    assert task2.task_id in result
+    assert task3.task_id not in result
+
+
+@pytest.mark.asyncio
+async def test_search_tasks_by_attributes_mixed_task_types(task_manager):
+    """Test search across different task types with common attributes"""
+    task1 = ExampleCPUTask(name="Common Name", semaphore_name="single")
+    task2 = ExampleIOTask(semaphore_name="multiple")
+
+    task_manager.task_store[task1.task_id] = task1
+    task_manager.task_store[task2.task_id] = task2
+
+    # Search for tasks with semaphore_name "single" (should find only CPU task)
+    result = task_manager.search_tasks_by_attributes({"semaphore_name": "single"})
+    assert len(result) == 1
+    assert task1.task_id in result
+    assert task2.task_id not in result
+
+    # Search for tasks with semaphore_name "multiple" (should find only IO task)
+    result = task_manager.search_tasks_by_attributes({"semaphore_name": "multiple"})
+    assert len(result) == 1
+    assert task2.task_id in result
+    assert task1.task_id not in result

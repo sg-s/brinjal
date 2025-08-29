@@ -35,6 +35,25 @@ async def get_all_tasks():
     return task_manager.get_all_tasks()
 
 
+@router.post("/search")
+async def search_tasks(search_criteria: dict):
+    """Search for tasks by attribute/value pairs using exact matching.
+
+    Accepts a JSON dict where keys are attribute names and values are expected values.
+    All criteria must match (AND logic).
+    Returns a list of task IDs that match all specified criteria.
+
+    Examples:
+        - {"name": "My Task", "status": "running"}
+        - {"task_type": "ExampleCPUTask", "semaphore_name": "single"}
+        - {"status": "done"}
+    """
+    # Perform the search using the provided criteria
+    matching_task_ids = task_manager.search_tasks_by_attributes(search_criteria)
+
+    return {"task_ids": matching_task_ids}
+
+
 @router.get("/queue/stream")
 async def stream_queue_updates(request: Request):
     """Stream real-time updates when tasks are added/removed from the queue"""
@@ -92,11 +111,11 @@ async def delete_task(task_id: str):
 
 
 @router.post("/example_cpu_task")
-async def example_task():
-    """example task that does nothing"""
+async def example_task(name: str = "Example Task"):
+    """Create and queue an example CPU task with the specified name"""
 
     # Create the example task
-    task = ExampleCPUTask()
+    task = ExampleCPUTask(name=name)
 
     # Add to queue
     task_id = await task_manager.add_task_to_queue(task)

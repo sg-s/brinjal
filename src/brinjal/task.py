@@ -118,11 +118,14 @@ class ExampleCPUTask(Task):
     update_sleep_time: float = 0.05  # Update every 50ms
     semaphore_name: str = "single"  # CPU-bound task - only one can run at a time
 
+    # optional arg
+    name: str = "Example Task"
+
     def run(self):
         """Synchronous function that does the actual work"""
         import time
 
-        self.heading = "Example Task"
+        self.heading = self.name
         self.body = "This is an example task. It will run for 10 seconds and update the progress every 0.1 seconds."
 
         for i in range(100):
