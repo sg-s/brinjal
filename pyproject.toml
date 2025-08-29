@@ -38,6 +38,7 @@ dev = [
 ]
 docs = [
     "black>=25.1.0",
+    "mkdocs-mermaid2-plugin",
     "mkdocs>=1.6.1",
     "mkdocs-material>=8.2.0",
     "mkdocs-material-extensions>=1.3.1",

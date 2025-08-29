@@ -42,6 +42,7 @@ nav:
 
 plugins:
   - search
+  - mermaid2
   - mkdocstrings:
       default_handler: python
       handlers:
@@ -56,44 +57,10 @@ markdown_extensions:
   - codehilite
   - footnotes
   - meta
-  - pymdownx.arithmatex:
-      generic: true
-  - pymdownx.betterem:
-      smart_enable: all
-  - pymdownx.caret
-  - pymdownx.details
-  - pymdownx.emoji:
-      emoji_generator: !!python/name:material.extensions.emoji.to_svg
-  - pymdownx.highlight:
-      anchor_linenums: true
-      line_spans: __span
-      pygments_lang_class: true
-  - pymdownx.inlinehilite
-  - pymdownx.keys
-  - pymdownx.magiclink
-  - pymdownx.mark
-  - pymdownx.smartsymbols
-  - pymdownx.snippets:
-      check_broken: true
-  - pymdownx.superfences:
-      custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:mermaid.fence_mermaid
-  - pymdownx.tabbed:
-      alternate_style: true
-      combine_header_slug: true
-      slug_unicode: true
-      tabs_style: is-boxed
-  - pymdownx.tasklist:
-      custom_checkbox: true
-  - pymdownx.tilde
   - toc:
       anchorlink: true
       permalink: true
       title: On this page
-  - pymdownx.arithmatex:
-      generic: true
 
 extra:
   social:
