@@ -253,3 +253,45 @@ for event in client.events():
 3. **Handle errors gracefully** in your client code
 4. **Clean up resources** when tasks complete
 5. **Use appropriate timeouts** for long-running operations
+
+## Search Tasks
+
+Search for tasks by attribute/value pairs using exact matching.
+
+**Endpoint:** `POST /search`
+
+**Request Body:** JSON object where keys are attribute names and values are expected values. All criteria must match (AND logic).
+
+**Response:** JSON object containing an array of matching task IDs.
+
+**Example Request:**
+```bash
+curl -X POST "http://localhost:8000/search" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Task",
+    "status": "running"
+  }'
+```
+
+**Example Response:**
+```json
+{
+  "task_ids": ["task-id-1", "task-id-2"]
+}
+```
+
+**Search Criteria Examples:**
+
+- Search by task name: `{"name": "Task A"}`
+- Search by status: `{"status": "done"}`
+- Search by task type: `{"task_type": "ExampleCPUTask"}`
+- Search by semaphore: `{"semaphore_name": "single"}`
+- Search by multiple criteria: `{"name": "Task A", "status": "running", "semaphore_name": "single"}`
+
+**Notes:**
+- All search criteria use exact matching
+- Multiple criteria are combined with AND logic
+- The `task_type` attribute is a special case that matches against the class name
+- Returns an empty list if no tasks match or if attributes don't exist
+- Works with any Task subclass attributes, making it flexible for future task types

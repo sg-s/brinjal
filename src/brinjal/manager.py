@@ -287,6 +287,47 @@ class TaskManager:
             for task in self.task_store.values()
         ]
 
+    def search_tasks_by_attributes(self, search_criteria: dict) -> List[str]:
+        """Search for tasks by attribute/value pairs using exact matching.
+
+        Args:
+            search_criteria: Dictionary where keys are attribute names and values are expected values.
+                           All criteria must match (AND logic).
+                           Special case: 'task_type' will match against the class name.
+
+        Returns:
+            List of task IDs that match all the specified criteria.
+            Returns empty list if no tasks match or if attributes don't exist.
+        """
+        if not search_criteria:
+            return []
+
+        matching_task_ids = []
+
+        for task in self.task_store.values():
+            matches_all_criteria = True
+
+            for attribute, expected_value in search_criteria.items():
+                # Handle special case for task_type
+                if attribute == "task_type":
+                    actual_value = task.__class__.__name__
+                else:
+                    # Check if the task has the attribute
+                    if not hasattr(task, attribute):
+                        matches_all_criteria = False
+                        break
+                    actual_value = getattr(task, attribute)
+
+                # Compare values
+                if actual_value != expected_value:
+                    matches_all_criteria = False
+                    break
+
+            if matches_all_criteria:
+                matching_task_ids.append(task.task_id)
+
+        return matching_task_ids
+
     def get_sse_event_generator(self, task_id: str, request):
         """Get an SSE event generator for a specific task"""
 
