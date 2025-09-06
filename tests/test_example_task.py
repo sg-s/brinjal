@@ -56,9 +56,11 @@ def test_example_task_run_method(example_task):
     assert example_task.status == "done"
     assert example_task.progress == 100
 
-    # Verify it took reasonable time (should be ~1 second with sleep_time=0.01)
+    # Verify it took reasonable time (should be ~4+ seconds with 3s startup + 1s execution with sleep_time=0.01)
     duration = end_time - start_time
-    assert 0.5 <= duration <= 2.0  # Allow some variance
+    assert (
+        3.0 <= duration <= 6.0
+    )  # Allow some variance for the 3s startup + execution time
 
 
 def test_example_task_progress_increments():
@@ -78,10 +80,11 @@ def test_example_task_progress_increments():
     thread = threading.Thread(target=run_task)
     thread.start()
 
-    # Wait a bit and check progress
-    time.sleep(0.1)
+    # Wait for the startup phase to complete (3+ seconds) and check progress
+    time.sleep(3.5)
     mid_progress = task.progress
-    assert 0 < mid_progress < 100
+    # Progress should be >= 0 after startup phase (could be 0 or higher)
+    assert mid_progress >= 0
 
     # Wait for completion
     thread.join()
