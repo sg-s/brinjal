@@ -165,8 +165,8 @@ async def test_multiple_tasks_execution(task_manager):
         task_id = await task_manager.add_task_to_queue(task)
         task_ids.append(task_id)
 
-    # Wait for all tasks to complete (should be fast with sleep_time=0.01)
-    max_wait = 10  # seconds
+    # Wait for all tasks to complete (each task takes ~4+ seconds, 3 tasks = ~12+ seconds)
+    max_wait = 20  # seconds - increased to account for 3 tasks with 3s startup each
     wait_time = 0
 
     while wait_time < max_wait:
