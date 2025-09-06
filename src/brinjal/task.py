@@ -139,8 +139,13 @@ class ExampleCPUTask(Task):
         """Synchronous function that does the actual work"""
         import time
 
-        self.heading = self.name
         self.body = "This is an example task. It will run for 10 seconds and update the progress every 0.1 seconds."
+
+        self.heading = "Starting up..."
+        self.progress = -1
+        time.sleep(3)
+
+        self.heading = self.name
 
         for i in range(100):
             self.progress = i

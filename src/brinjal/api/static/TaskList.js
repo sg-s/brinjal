@@ -29,12 +29,51 @@ class TaskList extends HTMLElement {
     // Helper function to convert percent or progress to a string
     formatPercent(progress) {
         if (typeof progress === 'number') {
+            if (progress < 0) {
+                return 'Running...';
+            }
             return `${progress}%`;
         }
         if (typeof progress === 'string' && progress.endsWith('%')) {
             return progress;
         }
         return '0%';
+    }
+
+    // Helper function to generate progress bar HTML
+    generateProgressBar(progress) {
+        const percent = typeof progress === 'number' ? progress : 0;
+        const percentStr = this.formatPercent(percent);
+        
+        if (percent < 0) {
+            // Animated striped progress bar for indeterminate progress
+            return `
+                <div class="progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" 
+                         aria-valuenow="100" 
+                         aria-valuemin="0" 
+                         aria-valuemax="100" 
+                         style="width: 100%">
+                        ${percentStr}
+                    </div>
+                </div>
+            `;
+        } else {
+            // Regular progress bar for determinate progress
+            return `
+                <div class="progress">
+                    <div class="progress-bar" 
+                         role="progressbar"
+                         style="width: ${percent}%;" 
+                         aria-valuenow="${percent}"
+                         aria-valuemin="0" 
+                         aria-valuemax="100">
+                        ${percentStr}
+                    </div>
+                </div>
+            `;
+        }
     }
 
     // Render a single task card
@@ -61,8 +100,7 @@ class TaskList extends HTMLElement {
         }
 
         // Progress bar
-        const percent = typeof task.progress === 'number' ? task.progress : 0;
-        const percentStr = this.formatPercent(percent);
+        const progressBarHtml = this.generateProgressBar(task.progress);
 
         // Title and body text from heading and body fields
         const title = task.heading || 'No Title';
@@ -101,13 +139,7 @@ class TaskList extends HTMLElement {
                                 <p class="card-text small text-muted mb-3">${bodyText}</p>
                                 
                                 <div class="mb-2">
-                                    <div class="progress">
-                                        <div class="progress-bar" role="progressbar"
-                                             style="width: ${percent}%;" aria-valuenow="${percent}"
-                                             aria-valuemin="0" aria-valuemax="100">
-                                            ${percentStr}
-                                        </div>
-                                    </div>
+                                    ${progressBarHtml}
                                 </div>
                                 
                                 <div class="small text-muted">
@@ -141,13 +173,7 @@ class TaskList extends HTMLElement {
                         <p class="card-text small text-muted mb-3">${bodyText}</p>
                         
                         <div class="mb-2">
-                            <div class="progress">
-                                <div class="progress-bar" role="progressbar"
-                                     style="width: ${percent}%;" aria-valuenow="${percent}"
-                                     aria-valuemin="0" aria-valuemax="100">
-                                    ${percentStr}
-                                </div>
-                            </div>
+                            ${progressBarHtml}
                         </div>
                         
                         <div class="small text-muted">
