@@ -59,7 +59,7 @@ async def stream_task_updates(task_id: str, request: Request):
     # Check if task exists
     task = task_manager.get_task(task_id)
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise HTTPException(status_code=404, detail="Task with ID {task_id} not found")
 
     # Get the event generator from the task manager
     event_generator = task_manager.get_sse_event_generator(task_id, request)
@@ -76,7 +76,9 @@ async def delete_task(task_id: str):
         # Check if task exists
         task = task_manager.get_task(task_id)
         if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
+            raise HTTPException(
+                status_code=404, detail="Task with ID {task_id} not found"
+            )
 
         # Remove the task from the store
         removed_task = await task_manager.remove_task_from_store(task_id)
