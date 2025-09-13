@@ -17,18 +17,6 @@ router = APIRouter(
 )
 
 
-@router.on_event("startup")
-async def startup_event():
-    """Start the task manager on startup"""
-    await task_manager.start()
-
-
-@router.on_event("shutdown")
-async def shutdown_event():
-    """Stop the task manager on shutdown"""
-    await task_manager.stop()
-
-
 @router.get("/queue")
 async def get_all_tasks():
     """Return all enqueued and running tasks with their status and progress."""
