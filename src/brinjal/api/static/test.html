@@ -20,12 +20,17 @@
             <ol>
                 <li>Add a CPU-bound task: <button onclick="addCPUTask()" class="btn btn-primary btn-sm">Add CPU Task</button></li>
                 <li>Add an I/O-bound task: <button onclick="addIOTask()" class="btn btn-success btn-sm">Add I/O Task</button></li>
+                <li>Add a recurring CPU task: <button onclick="addRecurringCPUTask()" class="btn btn-warning btn-sm">Add Recurring CPU Task</button></li>
                 <li>Watch the task appear and progress in real-time</li>
+                <li>Switch to the "Recurring Tasks" tab to see recurring tasks</li>
                 <li>Check the browser console for any errors</li>
             </ol>
         </div>
     </div>
 
+    <!-- Bootstrap JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
     <!-- Load the TaskList component -->
     <!-- Note: The path will depend on how the consuming application includes this router -->
     <script src="/static/TaskList.js"></script>
@@ -73,6 +78,35 @@
             } catch (error) {
                 console.error('Error adding I/O task:', error);
                 alert('Error adding I/O task');
+            }
+        }
+        
+        async function addRecurringCPUTask() {
+            try {
+                const response = await fetch('/example_recurring_cpu_task?cron_expression=*/1 * * * *&max_concurrent=1', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Recurring CPU task added successfully:', result);
+                    alert(`Recurring task created! ID: ${result.recurring_id}`);
+                    
+                    // Refresh the recurring tasks tab if it's visible
+                    const taskList = document.querySelector('#taskList');
+                    if (taskList) {
+                        taskList.loadRecurringTasks();
+                    }
+                } else {
+                    console.error('Failed to add recurring CPU task:', response.statusText);
+                    alert('Failed to add recurring CPU task');
+                }
+            } catch (error) {
+                console.error('Error adding recurring CPU task:', error);
+                alert('Error adding recurring CPU task');
             }
         }
     </script>

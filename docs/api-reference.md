@@ -102,6 +102,78 @@ Creates and queues an example I/O-bound task (uses "multiple" semaphore).
 }
 ```
 
+### Recurring Tasks
+
+#### GET `/recurring`
+
+Returns all registered recurring tasks with their configuration and status.
+
+**Response:**
+```json
+[
+  {
+    "recurring_id": "uuid-string",
+    "cron_expression": "*/5 * * * *",
+    "task_type": "ExampleCPUTask",
+    "max_concurrent": 2,
+    "enabled": true,
+    "next_run": "2024-01-01T12:05:00",
+    "last_run": "2024-01-01T12:00:00",
+    "consecutive_failures": 0,
+    "total_runs": 5,
+    "total_failures": 0,
+    "created_at": "2024-01-01T10:00:00"
+  }
+]
+```
+
+**Response Fields:**
+- `recurring_id`: Unique identifier for the recurring task
+- `cron_expression`: Cron expression defining when the task should run
+- `task_type`: Type of task that gets created (class name)
+- `max_concurrent`: Maximum number of instances that can run simultaneously
+- `enabled`: Whether the recurring task is currently enabled
+- `next_run`: ISO timestamp of when the task will run next (null if disabled)
+- `last_run`: ISO timestamp of when the task last ran (null if never run)
+- `consecutive_failures`: Number of consecutive failures
+- `total_runs`: Total number of times the task has been executed
+- `total_failures`: Total number of times the task has failed
+- `created_at`: ISO timestamp when the recurring task was created
+
+#### PATCH `/recurring/{recurring_id}/enable`
+
+Enable a recurring task by ID.
+
+**Parameters:**
+- `recurring_id` (path): The unique identifier of the recurring task
+
+**Response:**
+```json
+{
+  "message": "Recurring task {recurring_id} enabled successfully"
+}
+```
+
+**Error Responses:**
+- `404`: Recurring task not found
+
+#### PATCH `/recurring/{recurring_id}/disable`
+
+Disable a recurring task by ID.
+
+**Parameters:**
+- `recurring_id` (path): The unique identifier of the recurring task
+
+**Response:**
+```json
+{
+  "message": "Recurring task {recurring_id} disabled successfully"
+}
+```
+
+**Error Responses:**
+- `404`: Recurring task not found
+
 ## Task Models
 
 ### Task Base Class

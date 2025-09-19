@@ -14,16 +14,56 @@ class TaskList extends HTMLElement {
 
     render() {
         this.innerHTML = `
-            <div class="row" id="taskGrid">
-                <div class="col-12 d-flex justify-content-center py-4">
-                    <div class="spinner-border" role="status">
-                        <span class="visually-hidden">Loading...</span>
+            <!-- Bootstrap Tabs -->
+            <ul class="nav nav-tabs" id="taskTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="tasks-tab" data-bs-toggle="tab" data-bs-target="#tasks-pane" type="button" role="tab" aria-controls="tasks-pane" aria-selected="true">
+                        Tasks
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="recurring-tab" data-bs-toggle="tab" data-bs-target="#recurring-pane" type="button" role="tab" aria-controls="recurring-pane" aria-selected="false">
+                        Recurring Tasks
+                    </button>
+                </li>
+            </ul>
+            
+            <!-- Tab Content -->
+            <div class="tab-content" id="taskTabContent">
+                <!-- Tasks Tab -->
+                <div class="tab-pane fade show active" id="tasks-pane" role="tabpanel" aria-labelledby="tasks-tab">
+                    <div class="row mt-3" id="taskGrid">
+                        <div class="col-12 d-flex justify-content-center py-4">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recurring Tasks Tab -->
+                <div class="tab-pane fade" id="recurring-pane" role="tabpanel" aria-labelledby="recurring-tab">
+                    <div class="row mt-3" id="recurringTaskGrid">
+                        <div class="col-12 d-flex justify-content-center py-4">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         `;
         
         this.taskGrid = this.querySelector('#taskGrid');
+        this.recurringTaskGrid = this.querySelector('#recurringTaskGrid');
+        
+        // Add event listener for tab changes
+        const recurringTab = this.querySelector('#recurring-tab');
+        if (recurringTab) {
+            recurringTab.addEventListener('shown.bs.tab', () => {
+                this.loadRecurringTasks();
+            });
+        }
     }
 
     // Helper function to convert percent or progress to a string
@@ -127,7 +167,7 @@ class TaskList extends HTMLElement {
                                         <small class="task-id">Task ID: ${task.task_id}</small>
                                     </div>
                                     <span class="badge bg-${badgeClass} me-2">${task.status.toUpperCase()}</span>
-                                    <span class="badge bg-info">${taskTypeDisplay}</span>
+                                    <span class="badge bg-secondary">${taskTypeDisplay}</span>
                                     ${task.status === 'done' || task.status === 'failed' ? 
                                         `<button class="btn btn-sm btn-outline-danger ms-2" onclick="document.querySelector('#task-${task.task_id}').deleteTask('${task.task_id}')">
                                             <i class="bi bi-trash"></i>
@@ -161,7 +201,7 @@ class TaskList extends HTMLElement {
                                 <small class="task-id">Task ID: ${task.task_id}</small>
                             </div>
                             <span class="badge bg-${badgeClass} me-2">${task.status.toUpperCase()}</span>
-                            <span class="badge bg-info">${taskTypeDisplay}</span>
+                            <span class="badge bg-secondary">${taskTypeDisplay}</span>
                             ${task.status === 'done' || task.status === 'failed' ? 
                                 `<button class="btn btn-sm btn-outline-danger ms-2" onclick="document.querySelector('#task-${task.task_id}').deleteTask('${task.task_id}')">
                                     <i class="bi bi-trash"></i>
@@ -362,6 +402,164 @@ class TaskList extends HTMLElement {
         } catch (err) {
             console.error('Error deleting task:', err);
             alert('Error deleting task. Please try again.');
+        }
+    }
+
+    // Load recurring tasks
+    async loadRecurringTasks() {
+        this.recurringTaskGrid.innerHTML = `
+            <div class="col-12 d-flex justify-content-center py-4">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        `;
+        
+        try {
+            const response = await fetch(`${this.baseUrl}/recurring`);
+            const recurringTasks = await response.json();
+            this.recurringTaskGrid.innerHTML = '';
+            
+            if (recurringTasks.length === 0) {
+                this.recurringTaskGrid.innerHTML = '<div class="col-12"><p class="text-muted">No recurring tasks found</p></div>';
+                return;
+            }
+            
+            for (const recurringTask of recurringTasks) {
+                const card = this.renderRecurringTaskCard(recurringTask);
+                this.recurringTaskGrid.appendChild(card);
+            }
+        } catch (err) {
+            console.error('Error loading recurring tasks:', err);
+            this.recurringTaskGrid.innerHTML = '<div class="col-12"><p class="text-danger">Error loading recurring tasks</p></div>';
+        }
+    }
+
+    // Render a single recurring task card
+    renderRecurringTaskCard(recurringTask) {
+        const card = document.createElement('div');
+        card.className = 'col-12';
+        card.id = `recurring-task-${recurringTask.recurring_id}`;
+
+        // Card and badge classes
+        let cardClass = 'card mb-3';
+        let badgeClass = 'secondary';
+        if (recurringTask.enabled) {
+            cardClass += ' border-success';
+            badgeClass = 'success';
+        } else {
+            cardClass += ' border-secondary';
+            badgeClass = 'secondary';
+        }
+
+        // Format dates
+        const nextRun = recurringTask.next_run ? new Date(recurringTask.next_run).toLocaleString() : 'Not scheduled';
+        const lastRun = recurringTask.last_run ? new Date(recurringTask.last_run).toLocaleString() : 'Never run';
+        const created = new Date(recurringTask.created_at).toLocaleString();
+
+        card.innerHTML = `
+            <div class="${cardClass} recurring-task-card" style="width: 100%;">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="flex-grow-1">
+                            <small class="recurring-task-id">Recurring ID: ${recurringTask.recurring_id}</small>
+                        </div>
+                        <span class="badge bg-${badgeClass} me-2">${recurringTask.enabled ? 'ENABLED' : 'DISABLED'}</span>
+                        <span class="badge bg-secondary">${recurringTask.task_type}</span>
+                    </div>
+                    
+                    <h6 class="card-title mb-2">${recurringTask.task_type} - ${recurringTask.cron_expression}</h6>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="small text-muted">
+                                <div><strong>Next Run:</strong> ${nextRun}</div>
+                                <div><strong>Last Run:</strong> ${lastRun}</div>
+                                <div><strong>Created:</strong> ${created}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted">
+                                <div><strong>Max Concurrent:</strong> ${recurringTask.max_concurrent}</div>
+                                <div><strong>Total Runs:</strong> ${recurringTask.total_runs}</div>
+                                <div><strong>Total Failures:</strong> ${recurringTask.total_failures}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex align-items-center">
+                        <div class="form-check form-switch me-3">
+                            <input class="form-check-input" type="checkbox" id="toggle-${recurringTask.recurring_id}" 
+                                   ${recurringTask.enabled ? 'checked' : ''} 
+                                   onchange="document.querySelector('#recurring-task-${recurringTask.recurring_id}').toggleRecurringTask('${recurringTask.recurring_id}', this.checked)">
+                            <label class="form-check-label" for="toggle-${recurringTask.recurring_id}">
+                                ${recurringTask.enabled ? 'Enabled' : 'Disabled'}
+                            </label>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary" onclick="document.querySelector('#recurring-task-${recurringTask.recurring_id}').refreshRecurringTask()">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Add methods to the card element
+        card.toggleRecurringTask = (recurringId, enabled) => {
+            this.toggleRecurringTask(recurringId, enabled);
+        };
+        
+        card.refreshRecurringTask = () => {
+            this.loadRecurringTasks();
+        };
+        
+        return card;
+    }
+
+    // Toggle recurring task enabled/disabled
+    async toggleRecurringTask(recurringId, enabled) {
+        try {
+            const endpoint = enabled ? 'enable' : 'disable';
+            const response = await fetch(`${this.baseUrl}/recurring/${recurringId}/${endpoint}`, {
+                method: 'PATCH',
+            });
+            
+            if (response.ok) {
+                // Update the card to reflect the new state
+                const card = this.querySelector(`#recurring-task-${recurringId}`);
+                if (card) {
+                    const badge = card.querySelector('.badge');
+                    const label = card.querySelector('.form-check-label');
+                    
+                    if (enabled) {
+                        badge.className = 'badge bg-success me-2';
+                        badge.textContent = 'ENABLED';
+                        card.className = card.className.replace('border-secondary', 'border-success');
+                    } else {
+                        badge.className = 'badge bg-secondary me-2';
+                        badge.textContent = 'DISABLED';
+                        card.className = card.className.replace('border-success', 'border-secondary');
+                    }
+                    
+                    label.textContent = enabled ? 'Enabled' : 'Disabled';
+                }
+            } else {
+                console.error('Failed to toggle recurring task:', response.statusText);
+                alert('Failed to toggle recurring task. Please try again.');
+                // Revert the toggle switch
+                const toggle = this.querySelector(`#toggle-${recurringId}`);
+                if (toggle) {
+                    toggle.checked = !enabled;
+                }
+            }
+        } catch (err) {
+            console.error('Error toggling recurring task:', err);
+            alert('Error toggling recurring task. Please try again.');
+            // Revert the toggle switch
+            const toggle = this.querySelector(`#toggle-${recurringId}`);
+            if (toggle) {
+                toggle.checked = !enabled;
+            }
         }
     }
 
