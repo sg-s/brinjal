@@ -1,15 +1,12 @@
 """Task base class and examples Tasks."""
 
 import asyncio
-import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
 from uuid import uuid4
 
 from .models import TASK_STATES, TaskUpdate
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -62,9 +59,6 @@ class Task:
             completed_at=self.completed_at.isoformat() if self.completed_at else None,
         )
 
-        # Log the update for debugging
-        logger.info(f"Task {self.task_id} sending update: {update_data}")
-
         # Serialize the model before putting it on the queue
         await self.update_queue.put(update_data.model_dump())
 
@@ -114,8 +108,6 @@ class Task:
 
         # Send final status update
         await self.notify_update()
-
-        logger.info(f"Task {self.task_id} completed with status: {self.status}")
 
     def run(self):
         """Synchronous function that does the actual work"""
@@ -171,10 +163,9 @@ class ExampleIOTask(Task):
             with open(self.progress_file, "r") as f:
                 progress_value = int(f.read().strip())
                 self.progress = progress_value
-                logger.info(f"Progress hook read progress: {progress_value}%")
         except (FileNotFoundError, ValueError, IOError) as e:
-            logger.warning(f"Could not read progress from file: {e}")
             # Keep current progress if file reading fails
+            pass
 
     def run(self):
         """Synchronous function that writes progress to a file"""

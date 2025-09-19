@@ -145,10 +145,6 @@ async def delete_task(task_id: str):
         raise
     except Exception as e:
         # Log unexpected errors and return a generic error
-        import logging
-
-        logger = logging.getLogger(__name__)
-        logger.error(f"Unexpected error deleting task {task_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=500, detail=f"Internal server error: {str(e)}"
         ) from None
