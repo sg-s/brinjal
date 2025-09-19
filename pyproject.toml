@@ -47,9 +47,6 @@ docs = [
 ]
 
 
-[project.scripts]
-brinjal = "brinjal:main"
-
 [project.urls]
 Homepage = "https://github.com/sg-s/brinjal"
 Documentation = "https://sg-s.github.io/brinjal"

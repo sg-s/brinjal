@@ -163,10 +163,9 @@ class ExampleIOTask(Task):
             with open(self.progress_file, "r") as f:
                 progress_value = int(f.read().strip())
                 self.progress = progress_value
-                logger.info(f"Progress hook read progress: {progress_value}%")
         except (FileNotFoundError, ValueError, IOError) as e:
-            logger.warning(f"Could not read progress from file: {e}")
             # Keep current progress if file reading fails
+            pass
 
     def run(self):
         """Synchronous function that writes progress to a file"""

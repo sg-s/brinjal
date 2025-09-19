@@ -4,9 +4,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from .api.router import router
-from .manager import task_manager
-from .task import ExampleCPUTask
+from src.brinjal.api.router import router
+from src.brinjal.manager import task_manager
+from src.brinjal.task import ExampleCPUTask
 
 
 @asynccontextmanager
