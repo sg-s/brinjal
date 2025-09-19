@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -10,8 +9,6 @@ from uuid import uuid4
 
 from .models import TaskUpdate
 from .task import Task
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -91,16 +88,10 @@ class TaskManager:
     async def _worker_loop(self, worker_id: str):
         """Background worker that processes tasks"""
 
-        logger.info(f"Worker {worker_id} started")
         while True:
             try:
-                logger.info(f"Worker {worker_id} waiting for next task...")
-
                 # pick up a task from queue
                 task: Task = await self.task_queue.get()
-                logger.info(
-                    f"Worker {worker_id} picked up task {task.task_id} ({task.__class__.__name__})"
-                )
 
                 # Get the appropriate semaphore for this task
                 semaphore = self.semaphores.get(
@@ -108,14 +99,7 @@ class TaskManager:
                 )
 
                 # Acquire the semaphore before executing the task
-                logger.info(
-                    f"Worker {worker_id} acquiring semaphore '{task.semaphore_name}' for task {task.task_id}"
-                )
                 async with semaphore:
-                    logger.info(
-                        f"Worker {worker_id} acquired semaphore '{task.semaphore_name}' for task {task.task_id}"
-                    )
-
                     # Update task status to running and acquire semaphore
                     task.status = "running"
                     task.started_at = datetime.now()
@@ -123,17 +107,8 @@ class TaskManager:
                     self.task_store[task.task_id] = task
 
                     try:
-                        logger.info(f"Worker {worker_id} executing task {task.task_id}")
                         await task.execute()
-                        # Don't override status here - let the task set its own final status
-                        logger.info(
-                            f"Worker {worker_id} completed task {task.task_id} successfully"
-                        )
                     except Exception as e:
-                        logger.error(
-                            f"Worker {worker_id} failed task {task.task_id} with error: {str(e)}",
-                            exc_info=True,
-                        )
                         task.status = "failed"
                         task.results = str(e)
                         # Send final update for failed tasks
@@ -147,29 +122,15 @@ class TaskManager:
 
                         # Don't send additional updates - let the task handle its own status
                         # The task should have already set its final status and sent the final update
-                        logger.info(
-                            f"Worker {worker_id} finished task {task.task_id} with status {task.status}"
-                        )
                         self.task_queue.task_done()
-
-                        logger.info(
-                            f"Worker {worker_id} released semaphore '{task.semaphore_name}' for task {task.task_id}"
-                        )
             except asyncio.CancelledError:
-                logger.info(f"Worker {worker_id} cancelled")
                 break
             except Exception as e:
-                logger.error(
-                    f"Worker {worker_id} encountered error: {e}", exc_info=True
-                )
                 # Continue processing other tasks
                 continue
 
     async def add_task_to_queue(self, task: Task) -> str:
         """Add a task to the queue and return the task ID"""
-        logger.info(
-            f"Adding task {task.task_id} of type {task.__class__.__name__} to queue"
-        )
 
         # Set the loop reference for the task
         task.loop = self.loop
@@ -184,7 +145,6 @@ class TaskManager:
         # Notify queue subscribers of new task
         await self._notify_queue_subscribers("task_added", task)
 
-        logger.info(f"Task {task.task_id} added to queue successfully")
         return task.task_id
 
     async def _notify_queue_subscribers(
@@ -229,7 +189,6 @@ class TaskManager:
             try:
                 await queue.put(notification)
             except Exception as e:
-                logger.error(f"Failed to notify subscriber {subscriber_id}: {e}")
                 failed_subscribers.append(subscriber_id)
 
         # Remove failed subscribers after iteration
@@ -252,19 +211,12 @@ class TaskManager:
                     )
                 except Exception as e:
                     # Log notification errors but don't fail the deletion
-                    logger.warning(
-                        f"Failed to notify subscribers of task removal {task_id}: {e}"
-                    )
+                    pass
 
-                logger.info(f"Task {task_id} removed from store")
                 return task
             else:
-                logger.warning(f"Attempted to remove non-existent task {task_id}")
                 return None
         except Exception as e:
-            logger.error(
-                f"Error removing task {task_id} from store: {e}", exc_info=True
-            )
             raise
 
     def get_all_tasks(self) -> List[dict]:
@@ -433,18 +385,10 @@ class TaskManager:
                 else None,
             )
 
-            logger.info(
-                f"Task {task.task_id} final update - status: {task.status}, completed_at: {task.completed_at}"
-            )
-            logger.info(f"Final update data: {final_update.model_dump()}")
-
             # Put the final update on the task's update queue
             await task.update_queue.put(final_update.model_dump())
-            logger.info(
-                f"Sent final update for task {task.task_id} with completed_at: {task.completed_at}"
-            )
         except Exception as e:
-            logger.error(f"Failed to send final update for task {task.task_id}: {e}")
+            pass
 
     async def add_recurring_task(
         self,
@@ -541,7 +485,6 @@ class TaskManager:
 
     async def _recurring_scheduler(self):
         """Background task that handles recurring task scheduling"""
-        logger.info("Recurring task scheduler started")
 
         while True:
             try:
@@ -566,14 +509,9 @@ class TaskManager:
                             recurring_info.cron_expression
                         )
 
-                        logger.info(
-                            f"Scheduled recurring task {recurring_id} for execution"
-                        )
-
                 await asyncio.sleep(1)  # Check every second
 
             except Exception as e:
-                logger.error(f"Error in recurring scheduler: {e}", exc_info=True)
                 await asyncio.sleep(5)  # Wait longer on error
 
 
