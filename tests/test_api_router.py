@@ -14,11 +14,13 @@ client = TestClient(router)
 @pytest.fixture(autouse=True)
 def setup_and_teardown():
     """Setup and teardown for each test"""
-    # Clear the task store before each test
+    # Clear the task store and recurring tasks before each test
     task_manager.task_store.clear()
+    task_manager.recurring_tasks.clear()
     yield
-    # Clear the task store after each test
+    # Clear the task store and recurring tasks after each test
     task_manager.task_store.clear()
+    task_manager.recurring_tasks.clear()
 
 
 def test_search_tasks_empty_store():
@@ -239,3 +241,261 @@ def test_example_cpu_task_default_name():
     task = task_manager.get_task(task_id)
     assert task is not None
     assert task.name == "Example Task"
+
+
+def test_get_recurring_tasks_empty():
+    """Test getting recurring tasks when none exist"""
+    response = client.get("/recurring")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_get_recurring_tasks_with_tasks():
+    """Test getting recurring tasks when some exist"""
+    import asyncio
+
+    # Add a recurring task
+    template_task = ExampleCPUTask(name="Recurring CPU Task")
+    recurring_id = asyncio.run(
+        task_manager.add_recurring_task(
+            cron_expression="*/5 * * * *",
+            template_task=template_task,
+            max_concurrent=2,
+        )
+    )
+
+    response = client.get("/recurring")
+    assert response.status_code == 200
+
+    result = response.json()
+    assert len(result) == 1
+
+    recurring_task = result[0]
+    assert recurring_task["recurring_id"] == recurring_id
+    assert recurring_task["cron_expression"] == "*/5 * * * *"
+    assert recurring_task["task_type"] == "ExampleCPUTask"
+    assert recurring_task["max_concurrent"] == 2
+    assert recurring_task["enabled"] is True
+    assert recurring_task["consecutive_failures"] == 0
+    assert recurring_task["total_runs"] == 0
+    assert recurring_task["total_failures"] == 0
+    assert "created_at" in recurring_task
+    assert recurring_task["next_run"] is not None
+    assert recurring_task["last_run"] is None
+
+
+def test_get_recurring_tasks_multiple():
+    """Test getting multiple recurring tasks"""
+    import asyncio
+
+    # Add multiple recurring tasks
+    template_task1 = ExampleCPUTask(name="Recurring CPU Task 1")
+    template_task2 = ExampleIOTask()
+
+    recurring_id_1 = asyncio.run(
+        task_manager.add_recurring_task(
+            cron_expression="*/5 * * * *",
+            template_task=template_task1,
+            max_concurrent=1,
+        )
+    )
+
+    recurring_id_2 = asyncio.run(
+        task_manager.add_recurring_task(
+            cron_expression="0 * * * *",
+            template_task=template_task2,
+            max_concurrent=3,
+        )
+    )
+
+    response = client.get("/recurring")
+    assert response.status_code == 200
+
+    result = response.json()
+    assert len(result) == 2
+
+    # Check that both tasks are present
+    recurring_ids = [task["recurring_id"] for task in result]
+    assert recurring_id_1 in recurring_ids
+    assert recurring_id_2 in recurring_ids
+
+    # Find each task and verify its properties
+    task1 = next(task for task in result if task["recurring_id"] == recurring_id_1)
+    task2 = next(task for task in result if task["recurring_id"] == recurring_id_2)
+
+    assert task1["task_type"] == "ExampleCPUTask"
+    assert task1["max_concurrent"] == 1
+    assert task1["cron_expression"] == "*/5 * * * *"
+
+    assert task2["task_type"] == "ExampleIOTask"
+    assert task2["max_concurrent"] == 3
+    assert task2["cron_expression"] == "0 * * * *"
+
+
+def test_get_recurring_tasks_disabled():
+    """Test getting recurring tasks including disabled ones"""
+    import asyncio
+
+    # Add a recurring task and then disable it
+    template_task = ExampleCPUTask(name="Disabled Task")
+    recurring_id = asyncio.run(
+        task_manager.add_recurring_task(
+            cron_expression="*/5 * * * *",
+            template_task=template_task,
+        )
+    )
+
+    # Disable the task
+    task_manager.disable_recurring_task(recurring_id)
+
+    response = client.get("/recurring")
+    assert response.status_code == 200
+
+    result = response.json()
+    assert len(result) == 1
+
+    recurring_task = result[0]
+    assert recurring_task["recurring_id"] == recurring_id
+    assert recurring_task["enabled"] is False
+
+
+def test_enable_recurring_task_success():
+    """Test enabling a recurring task successfully"""
+    import asyncio
+
+    # Add a recurring task and disable it
+    template_task = ExampleCPUTask(name="Test Task")
+    recurring_id = asyncio.run(
+        task_manager.add_recurring_task(
+            cron_expression="*/5 * * * *",
+            template_task=template_task,
+        )
+    )
+
+    # Disable the task first
+    task_manager.disable_recurring_task(recurring_id)
+    assert task_manager.recurring_tasks[recurring_id].enabled is False
+
+    # Enable the task via API
+    response = client.patch(f"/recurring/{recurring_id}/enable")
+    assert response.status_code == 200
+
+    result = response.json()
+    assert result["message"] == f"Recurring task {recurring_id} enabled successfully"
+
+    # Verify the task is enabled
+    assert task_manager.recurring_tasks[recurring_id].enabled is True
+
+
+def test_disable_recurring_task_success():
+    """Test disabling a recurring task successfully"""
+    import asyncio
+
+    # Add a recurring task (enabled by default)
+    template_task = ExampleCPUTask(name="Test Task")
+    recurring_id = asyncio.run(
+        task_manager.add_recurring_task(
+            cron_expression="*/5 * * * *",
+            template_task=template_task,
+        )
+    )
+
+    # Verify it's enabled initially
+    assert task_manager.recurring_tasks[recurring_id].enabled is True
+
+    # Disable the task via API
+    response = client.patch(f"/recurring/{recurring_id}/disable")
+    assert response.status_code == 200
+
+    result = response.json()
+    assert result["message"] == f"Recurring task {recurring_id} disabled successfully"
+
+    # Verify the task is disabled
+    assert task_manager.recurring_tasks[recurring_id].enabled is False
+
+
+def test_enable_recurring_task_not_found():
+    """Test enabling a non-existent recurring task"""
+    fake_id = "non-existent-id"
+
+    try:
+        response = client.patch(f"/recurring/{fake_id}/enable")
+        # If we get here, the request didn't raise an exception
+        assert response.status_code == 404
+        result = response.json()
+        assert result["detail"] == f"Recurring task {fake_id} not found"
+    except Exception as e:
+        # If an exception is raised, it should be an HTTPException with 404
+        assert "404" in str(e)
+        assert f"Recurring task {fake_id} not found" in str(e)
+
+
+def test_disable_recurring_task_not_found():
+    """Test disabling a non-existent recurring task"""
+    fake_id = "non-existent-id"
+
+    try:
+        response = client.patch(f"/recurring/{fake_id}/disable")
+        # If we get here, the request didn't raise an exception
+        assert response.status_code == 404
+        result = response.json()
+        assert result["detail"] == f"Recurring task {fake_id} not found"
+    except Exception as e:
+        # If an exception is raised, it should be an HTTPException with 404
+        assert "404" in str(e)
+        assert f"Recurring task {fake_id} not found" in str(e)
+
+
+def test_enable_already_enabled_task():
+    """Test enabling an already enabled recurring task"""
+    import asyncio
+
+    # Add a recurring task (enabled by default)
+    template_task = ExampleCPUTask(name="Test Task")
+    recurring_id = asyncio.run(
+        task_manager.add_recurring_task(
+            cron_expression="*/5 * * * *",
+            template_task=template_task,
+        )
+    )
+
+    # Verify it's enabled initially
+    assert task_manager.recurring_tasks[recurring_id].enabled is True
+
+    # Try to enable it again
+    response = client.patch(f"/recurring/{recurring_id}/enable")
+    assert response.status_code == 200
+
+    result = response.json()
+    assert result["message"] == f"Recurring task {recurring_id} enabled successfully"
+
+    # Verify it's still enabled
+    assert task_manager.recurring_tasks[recurring_id].enabled is True
+
+
+def test_disable_already_disabled_task():
+    """Test disabling an already disabled recurring task"""
+    import asyncio
+
+    # Add a recurring task and disable it
+    template_task = ExampleCPUTask(name="Test Task")
+    recurring_id = asyncio.run(
+        task_manager.add_recurring_task(
+            cron_expression="*/5 * * * *",
+            template_task=template_task,
+        )
+    )
+
+    # Disable the task first
+    task_manager.disable_recurring_task(recurring_id)
+    assert task_manager.recurring_tasks[recurring_id].enabled is False
+
+    # Try to disable it again
+    response = client.patch(f"/recurring/{recurring_id}/disable")
+    assert response.status_code == 200
+
+    result = response.json()
+    assert result["message"] == f"Recurring task {recurring_id} disabled successfully"
+
+    # Verify it's still disabled
+    assert task_manager.recurring_tasks[recurring_id].enabled is False

@@ -1,4 +1,4 @@
-# Brinjal Documentation
+# 🍆 Brinjal: tasks made simple
 
 Welcome to the Brinjal documentation! Brinjal is a generic, reusable task management system built with FastAPI and asyncio.
 

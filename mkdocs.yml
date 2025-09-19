@@ -1,7 +1,7 @@
-site_name: Brinjal Documentation
+site_name: Brinjal
 site_description: Generic task management system built with FastAPI and asyncio
-site_author: Your Name
-site_url: https://your-domain.com/brinjal
+site_author: Srinivas Gorur-Shandilya
+site_url: https://sg-s.github.io/brinjal
 
 repo_name: sg-s/brinjal
 repo_url: https://github.com/sg-s/brinjal
@@ -18,14 +18,14 @@ theme:
     - search.share
   palette:
     - scheme: default
-      primary: indigo
-      accent: indigo
+      primary: purple
+      accent: purple
       toggle:
         icon: material/toggle-switch
         name: Switch to dark mode
     - scheme: slate
-      primary: indigo
-      accent: indigo
+      primary: purple
+      accent: purple
       toggle:
         icon: material/toggle-switch-off-outline
         name: Switch to light mode
@@ -33,12 +33,12 @@ theme:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Tutorial: tutorial.md
+  - How-to: how-to.md
   - Task Development: task-development.md
-  - API Reference: api-reference.md
+  - Reference: api-reference.md
   - Web Component: web-component.md
   - Integration Guide: integration.md
-  - Examples: examples.md
-  - Development: development.md
 
 plugins:
   - search

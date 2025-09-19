@@ -23,6 +23,60 @@ async def get_all_tasks():
     return task_manager.get_all_tasks()
 
 
+@router.get("/recurring")
+async def get_recurring_tasks():
+    """Return all registered recurring tasks with their configuration and status."""
+    recurring_tasks = task_manager.get_all_recurring_tasks()
+
+    # Convert RecurringTaskInfo objects to dictionaries for JSON serialization
+    result = []
+    for recurring_info in recurring_tasks:
+        task_info = {
+            "recurring_id": recurring_info.recurring_id,
+            "cron_expression": recurring_info.cron_expression,
+            "task_type": recurring_info.template_task.__class__.__name__,
+            "max_concurrent": recurring_info.max_concurrent,
+            "enabled": recurring_info.enabled,
+            "next_run": recurring_info.next_run.isoformat()
+            if recurring_info.next_run
+            else None,
+            "last_run": recurring_info.last_run.isoformat()
+            if recurring_info.last_run
+            else None,
+            "consecutive_failures": recurring_info.consecutive_failures,
+            "total_runs": recurring_info.total_runs,
+            "total_failures": recurring_info.total_failures,
+            "created_at": recurring_info.created_at.isoformat(),
+        }
+        result.append(task_info)
+
+    return result
+
+
+@router.patch("/recurring/{recurring_id}/enable")
+async def enable_recurring_task(recurring_id: str):
+    """Enable a recurring task by ID."""
+    success = task_manager.enable_recurring_task(recurring_id)
+    if not success:
+        raise HTTPException(
+            status_code=404, detail=f"Recurring task {recurring_id} not found"
+        )
+
+    return {"message": f"Recurring task {recurring_id} enabled successfully"}
+
+
+@router.patch("/recurring/{recurring_id}/disable")
+async def disable_recurring_task(recurring_id: str):
+    """Disable a recurring task by ID."""
+    success = task_manager.disable_recurring_task(recurring_id)
+    if not success:
+        raise HTTPException(
+            status_code=404, detail=f"Recurring task {recurring_id} not found"
+        )
+
+    return {"message": f"Recurring task {recurring_id} disabled successfully"}
+
+
 @router.post("/search")
 async def search_tasks(search_criteria: dict):
     """Search for tasks by attribute/value pairs using exact matching.
@@ -122,6 +176,28 @@ async def progress_hook_example_task():
     # Add to queue
     task_id = await task_manager.add_task_to_queue(task)
     return {"task_id": task_id}
+
+
+@router.post("/example_recurring_cpu_task")
+async def example_recurring_cpu_task(
+    cron_expression: str = "*/1 * * * *", max_concurrent: int = 1
+):
+    """Create and register a recurring CPU task"""
+
+    # Create the template task
+    template_task = ExampleCPUTask(name="Recurring CPU Task")
+
+    # Add as recurring task
+    recurring_id = await task_manager.add_recurring_task(
+        cron_expression=cron_expression,
+        template_task=template_task,
+        max_concurrent=max_concurrent,
+    )
+
+    return {
+        "recurring_id": recurring_id,
+        "message": f"Recurring task created with cron: {cron_expression}",
+    }
 
 
 @router.get("/test", response_class=HTMLResponse)
