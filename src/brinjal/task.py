@@ -31,11 +31,6 @@ class Task:
     semaphore_name: str = "default"
 
     def progress_hook(self):
-        """Optional progress hook. Use this to update the progress of the task."""
-
-        pass
-
-    def progress_hook(self):
         """Hook method for subclasses to inject custom progress logic.
 
         This method is called before checking if progress has changed.

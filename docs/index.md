@@ -14,6 +14,8 @@ Brinjal provides a flexible foundation for building task-based applications with
 - **Flexible Integration**: No hardcoded prefixes - easily integrated into any FastAPI application
 - **Web Components**: Reusable `<task-list>` component for displaying tasks
 - **Self-contained**: No external static file mounting required
+- **Automatic Task Pruning**: Keeps only the 10 most recent succeeded tasks to prevent memory bloat
+- **Recurring Tasks**: Schedule tasks to run automatically using cron-like expressions
 
 ## Quick Start
 
@@ -53,6 +55,9 @@ Learn how to create custom tasks by extending the base `Task` class. Includes ex
 
 ### ⏰ [Recurring Tasks](recurring-tasks.md)
 Learn how to set up automated recurring tasks using cron-like syntax. Includes scheduling, monitoring, and best practices.
+
+### 🧹 [Task Management](task-management.md)
+Learn about automatic task pruning, memory management, and how Brinjal keeps your system running efficiently.
 
 ## Architecture Overview
 
