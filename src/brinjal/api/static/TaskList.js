@@ -291,7 +291,9 @@ class TaskList extends HTMLElement {
                 this.taskGrid.innerHTML = '<div class="col-12"><p class="text-muted">No tasks found</p></div>';
                 return;
             }
-            for (const task of tasks) {
+            // Reverse the order to show newest tasks first
+            const reversedTasks = tasks.reverse();
+            for (const task of reversedTasks) {
                 const card = this.renderTaskCard(task);
                 this.taskGrid.appendChild(card);
                 this.startSSEConnection(task);
@@ -333,7 +335,8 @@ class TaskList extends HTMLElement {
             this.updateNoTasksMessage();
             
             const card = this.renderTaskCard(task);
-            this.taskGrid.appendChild(card);
+            // Prepend new task at the top to show newest first
+            this.taskGrid.insertBefore(card, this.taskGrid.firstChild);
             this.startSSEConnection(task);
         } else if (data.type === 'task_removed') {
             // Task removed from queue (completed, failed, etc.)

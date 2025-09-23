@@ -54,6 +54,9 @@ class TaskManager:
         # Worker pool configuration
         self.max_workers = 20  # Maximum number of worker tasks
 
+        # Task pruning configuration
+        self.max_succeeded_tasks = 10  # Keep only the 10 most recent succeeded tasks
+
     async def start(self):  # this needs to be async
         """Start the worker loops"""
         if not self._worker_tasks:  # Only start if no workers are running
@@ -120,8 +123,13 @@ class TaskManager:
                             # Send final update with completed timestamp
                             await self._send_final_task_update(task)
 
+                            # Prune old succeeded tasks after a new one completes
+                            await self._prune_succeeded_tasks()
+
                         # Don't send additional updates - let the task handle its own status
                         # The task should have already set its final status and sent the final update
+
+                        # Mark task as done INSIDE the semaphore context (like v0.4.0)
                         self.task_queue.task_done()
             except asyncio.CancelledError:
                 break
@@ -389,6 +397,53 @@ class TaskManager:
             await task.update_queue.put(final_update.model_dump())
         except Exception as e:
             pass
+
+    async def _prune_succeeded_tasks(self):
+        """Remove oldest succeeded tasks if we have more than max_succeeded_tasks.
+
+        This method keeps only the most recent succeeded tasks and removes the oldest ones.
+        Failed and queued tasks are never pruned.
+        Tasks without completed_at are also removed as they are not valid succeeded tasks.
+        """
+        # Get all succeeded tasks with completed_at sorted by completion time (newest first)
+        valid_succeeded_tasks = [
+            (task_id, task)
+            for task_id, task in self.task_store.items()
+            if task.status == "done" and task.completed_at is not None
+        ]
+
+        # Get all succeeded tasks without completed_at (these should be removed)
+        invalid_succeeded_tasks = [
+            (task_id, task)
+            for task_id, task in self.task_store.items()
+            if task.status == "done" and task.completed_at is None
+        ]
+
+        # Sort valid tasks by completion time, newest first
+        valid_succeeded_tasks.sort(key=lambda x: x[1].completed_at, reverse=True)
+
+        # Remove invalid succeeded tasks (without completed_at)
+        tasks_to_remove = []
+        for task_id, _ in invalid_succeeded_tasks:
+            tasks_to_remove.append(task_id)
+
+        # If we have more valid tasks than the limit, remove the oldest ones
+        if len(valid_succeeded_tasks) > self.max_succeeded_tasks:
+            oldest_valid_tasks = valid_succeeded_tasks[self.max_succeeded_tasks :]
+            for task_id, _ in oldest_valid_tasks:
+                tasks_to_remove.append(task_id)
+
+        # Remove all tasks that need to be pruned
+        for task_id in tasks_to_remove:
+            # Remove from task store
+            self.task_store.pop(task_id, None)
+
+            # Notify queue subscribers of removed task
+            try:
+                await self._notify_queue_subscribers("task_removed", task_id=task_id)
+            except Exception:
+                # Log notification errors but don't fail the pruning
+                pass
 
     async def add_recurring_task(
         self,

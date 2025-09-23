@@ -36,9 +36,15 @@
     <script src="/static/TaskList.js"></script>
     
     <script>
+        // Counter for CPU task names
+        let cpuTaskCounter = 0;
+        
         async function addCPUTask() {
             try {
-                const response = await fetch('/example_cpu_task', {
+                cpuTaskCounter++;
+                const taskName = `Example Task #${cpuTaskCounter}`;
+                
+                const response = await fetch(`/example_cpu_task?name=${encodeURIComponent(taskName)}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
