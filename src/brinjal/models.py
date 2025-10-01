@@ -20,3 +20,8 @@ class TaskUpdate(BaseModel):
     body: Optional[str] = None
     started_at: Optional[str] = None  # ISO format timestamp when task started
     completed_at: Optional[str] = None  # ISO format timestamp when task completed
+
+    # Error information
+    error_message: Optional[str] = None
+    error_type: Optional[str] = None
+    error_traceback: Optional[str] = None

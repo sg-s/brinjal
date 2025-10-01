@@ -14,6 +14,20 @@ class TaskList extends HTMLElement {
 
     render() {
         this.innerHTML = `
+            <style>
+                .task-failed-clickable {
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                }
+                .task-failed-clickable:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+                }
+                .task-failed-clickable:hover .card-title {
+                    color: #dc3545;
+                }
+            </style>
+            
             <!-- Bootstrap Tabs -->
             <ul class="nav nav-tabs" id="taskTabs" role="tablist">
                 <li class="nav-item" role="presentation">
@@ -52,6 +66,75 @@ class TaskList extends HTMLElement {
                     </div>
                 </div>
             </div>
+            
+            <!-- Error Details Modal -->
+            <div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="errorModalLabel">Task Error Details</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <h6>Task Information</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <strong>Task ID:</strong> <span id="errorTaskId" class="font-monospace"></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Task Type:</strong> <span id="errorTaskType"></span>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-md-6">
+                                        <strong>Status:</strong> <span id="errorTaskStatus" class="badge bg-danger">FAILED</span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Progress:</strong> <span id="errorTaskProgress"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h6>Error Information</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <strong>Error Type:</strong> <span id="errorType" class="font-monospace text-danger"></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Error Message:</strong> <span id="errorMessage" class="text-danger"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h6>Stack Trace</h6>
+                                <pre id="errorTraceback" class="bg-light p-3 rounded" style="max-height: 400px; overflow-y: auto; font-size: 0.85em;"></pre>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h6>Task Details</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <strong>Started:</strong> <span id="errorTaskStarted"></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Completed:</strong> <span id="errorTaskCompleted"></span>
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <strong>Description:</strong> <span id="errorTaskDescription"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-primary" id="copyErrorBtn">Copy Error Details</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         `;
         
         this.taskGrid = this.querySelector('#taskGrid');
@@ -62,6 +145,14 @@ class TaskList extends HTMLElement {
         if (recurringTab) {
             recurringTab.addEventListener('shown.bs.tab', () => {
                 this.loadRecurringTasks();
+            });
+        }
+        
+        // Add event listener for copy error button
+        const copyErrorBtn = this.querySelector('#copyErrorBtn');
+        if (copyErrorBtn) {
+            copyErrorBtn.addEventListener('click', () => {
+                this.copyErrorDetails();
             });
         }
     }
@@ -125,6 +216,7 @@ class TaskList extends HTMLElement {
         // Card and badge classes
         let cardClass = 'card mb-3';
         let badgeClass = 'secondary';
+        let clickableClass = '';
         if (task.status === 'running') {
             cardClass += ' border-primary';
             badgeClass = 'primary';
@@ -134,6 +226,7 @@ class TaskList extends HTMLElement {
         } else if (task.status === 'failed') {
             cardClass += ' border-danger';
             badgeClass = 'danger';
+            clickableClass = ' task-failed-clickable';
         } else if (task.status === 'queued') {
             cardClass += ' border-warning';
             badgeClass = 'warning';
@@ -153,7 +246,7 @@ class TaskList extends HTMLElement {
         if (task.img) {
             // Card with image cap
             card.innerHTML = `
-                <div class="${cardClass} task-card" style="width: 100%;">
+                <div class="${cardClass}${clickableClass} task-card" style="width: 100%;" ${task.status === 'failed' ? `onclick="document.querySelector('#task-${task.task_id}').showErrorModal()"` : ''}>
                     <div class="row g-0 align-items-stretch" style="height: 100%;">
                         <div class="col-md-3 col-4 p-0" style="height: 100%;">
                             <div style="height: 100%; width: 100%; overflow: hidden;">
@@ -169,7 +262,7 @@ class TaskList extends HTMLElement {
                                     <span class="badge bg-${badgeClass} me-2">${task.status.toUpperCase()}</span>
                                     <span class="badge bg-secondary">${taskTypeDisplay}</span>
                                     ${task.status === 'done' || task.status === 'failed' ? 
-                                        `<button class="btn btn-sm btn-outline-danger ms-2" onclick="document.querySelector('#task-${task.task_id}').deleteTask('${task.task_id}')">
+                                        `<button class="btn btn-sm btn-outline-danger ms-2" onclick="event.stopPropagation(); document.querySelector('#task-${task.task_id}').deleteTask('${task.task_id}')">
                                             <i class="bi bi-trash"></i>
                                         </button>` : ''
                                     }
@@ -194,7 +287,7 @@ class TaskList extends HTMLElement {
         } else {
             // Card without image cap - full width content
             card.innerHTML = `
-                <div class="${cardClass} task-card" style="width: 100%;">
+                <div class="${cardClass}${clickableClass} task-card" style="width: 100%;" ${task.status === 'failed' ? `onclick="document.querySelector('#task-${task.task_id}').showErrorModal()"` : ''}>
                     <div class="card-body">
                         <div class="d-flex align-items-center mb-2">
                             <div class="flex-grow-1">
@@ -203,7 +296,7 @@ class TaskList extends HTMLElement {
                             <span class="badge bg-${badgeClass} me-2">${task.status.toUpperCase()}</span>
                             <span class="badge bg-secondary">${taskTypeDisplay}</span>
                             ${task.status === 'done' || task.status === 'failed' ? 
-                                `<button class="btn btn-sm btn-outline-danger ms-2" onclick="document.querySelector('#task-${task.task_id}').deleteTask('${task.task_id}')">
+                                `<button class="btn btn-sm btn-outline-danger ms-2" onclick="event.stopPropagation(); document.querySelector('#task-${task.task_id}').deleteTask('${task.task_id}')">
                                     <i class="bi bi-trash"></i>
                                 </button>` : ''
                             }
@@ -225,9 +318,13 @@ class TaskList extends HTMLElement {
             `;
         }
         
-        // Add deleteTask method to the card element
+        // Add methods to the card element
         card.deleteTask = (taskId) => {
             this.deleteTask(taskId);
+        };
+        
+        card.showErrorModal = () => {
+            this.showErrorModal(task);
         };
         
         return card;
@@ -564,6 +661,85 @@ class TaskList extends HTMLElement {
                 toggle.checked = !enabled;
             }
         }
+    }
+
+    // Show error details modal for a failed task
+    showErrorModal(task) {
+        // Populate modal with task error information
+        document.getElementById('errorTaskId').textContent = task.task_id;
+        document.getElementById('errorTaskType').textContent = task.task_type;
+        document.getElementById('errorTaskStatus').textContent = task.status.toUpperCase();
+        document.getElementById('errorTaskProgress').textContent = this.formatPercent(task.progress);
+        
+        // Error information
+        document.getElementById('errorType').textContent = task.error_type || 'Unknown';
+        document.getElementById('errorMessage').textContent = task.error_message || 'No error message available';
+        
+        // Stack trace
+        const tracebackElement = document.getElementById('errorTraceback');
+        if (task.error_traceback) {
+            tracebackElement.textContent = task.error_traceback;
+        } else {
+            tracebackElement.textContent = 'No stack trace available';
+        }
+        
+        // Task details
+        document.getElementById('errorTaskStarted').textContent = task.started_at ? new Date(task.started_at).toLocaleString() : 'Not started';
+        document.getElementById('errorTaskCompleted').textContent = task.completed_at ? new Date(task.completed_at).toLocaleString() : 'Not completed';
+        document.getElementById('errorTaskDescription').textContent = task.body || 'No description available';
+        
+        // Store current task for copy functionality
+        this.currentErrorTask = task;
+        
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('errorModal'));
+        modal.show();
+    }
+    
+    // Copy error details to clipboard
+    copyErrorDetails() {
+        if (!this.currentErrorTask) return;
+        
+        const task = this.currentErrorTask;
+        const errorDetails = `Task Error Details
+========================
+
+Task Information:
+- Task ID: ${task.task_id}
+- Task Type: ${task.task_type}
+- Status: ${task.status.toUpperCase()}
+- Progress: ${this.formatPercent(task.progress)}
+
+Error Information:
+- Error Type: ${task.error_type || 'Unknown'}
+- Error Message: ${task.error_message || 'No error message available'}
+
+Stack Trace:
+${task.error_traceback || 'No stack trace available'}
+
+Task Details:
+- Started: ${task.started_at ? new Date(task.started_at).toLocaleString() : 'Not started'}
+- Completed: ${task.completed_at ? new Date(task.completed_at).toLocaleString() : 'Not completed'}
+- Description: ${task.body || 'No description available'}`;
+
+        // Copy to clipboard
+        navigator.clipboard.writeText(errorDetails).then(() => {
+            // Show success feedback
+            const copyBtn = document.getElementById('copyErrorBtn');
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = 'Copied!';
+            copyBtn.classList.remove('btn-primary');
+            copyBtn.classList.add('btn-success');
+            
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+                copyBtn.classList.remove('btn-success');
+                copyBtn.classList.add('btn-primary');
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy error details:', err);
+            alert('Failed to copy error details to clipboard');
+        });
     }
 
     // Cleanup method
