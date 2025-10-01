@@ -59,6 +59,9 @@ Learn how to set up automated recurring tasks using cron-like syntax. Includes s
 ### 🧹 [Task Management](task-management.md)
 Learn about automatic task pruning, memory management, and how Brinjal keeps your system running efficiently.
 
+### 🚨 [Error Handling](error-handling.md)
+Comprehensive guide to error handling, debugging failed tasks, and monitoring task execution errors.
+
 ## Architecture Overview
 
 Brinjal is designed with separation of concerns in mind:

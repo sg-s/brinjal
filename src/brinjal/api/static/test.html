@@ -19,6 +19,7 @@
             <h3>Test Instructions:</h3>
             <ol>
                 <li>Add a CPU-bound task: <button onclick="addCPUTask()" class="btn btn-primary btn-sm">Add CPU Task</button></li>
+                <li>Add a CPU task with 10% failure probability: <button onclick="addCPUTaskWithFailure()" class="btn btn-danger btn-sm">Add CPU Task (10% Failure)</button></li>
                 <li>Add an I/O-bound task: <button onclick="addIOTask()" class="btn btn-success btn-sm">Add I/O Task</button></li>
                 <li>Add a recurring CPU task: <button onclick="addRecurringCPUTask()" class="btn btn-warning btn-sm">Add Recurring CPU Task</button></li>
                 <li>Watch the task appear and progress in real-time</li>
@@ -62,6 +63,31 @@
             } catch (error) {
                 console.error('Error adding CPU task:', error);
                 alert('Error adding CPU task');
+            }
+        }
+        
+        async function addCPUTaskWithFailure() {
+            try {
+                cpuTaskCounter++;
+                const taskName = `Example Task (10% Failure) #${cpuTaskCounter}`;
+                
+                const response = await fetch(`/example_cpu_task?name=${encodeURIComponent(taskName)}&failure_probability=0.1`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('CPU task with failure probability added successfully:', result);
+                } else {
+                    console.error('Failed to add CPU task with failure probability:', response.statusText);
+                    alert('Failed to add CPU task with failure probability');
+                }
+            } catch (error) {
+                console.error('Error adding CPU task with failure probability:', error);
+                alert('Error adding CPU task with failure probability');
             }
         }
         

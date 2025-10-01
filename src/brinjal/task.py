@@ -1,6 +1,8 @@
 """Task base class and examples Tasks."""
 
 import asyncio
+import random
+import traceback
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
@@ -30,6 +32,11 @@ class Task:
 
     semaphore_name: str = "default"
 
+    # Error tracking fields
+    error_message: Optional[str] = None
+    error_type: Optional[str] = None
+    error_traceback: Optional[str] = None
+
     def progress_hook(self):
         """Hook method for subclasses to inject custom progress logic.
 
@@ -38,6 +45,18 @@ class Task:
         (like log files, APIs, etc.) and update self.progress.
         """
         pass
+
+    def capture_error(self, exception: Exception):
+        """Capture detailed error information from an exception."""
+        self.error_type = type(exception).__name__
+        self.error_message = str(exception)
+        # Use format_exception to get the full traceback
+        self.error_traceback = "".join(
+            traceback.format_exception(
+                type(exception), exception, exception.__traceback__
+            )
+        )
+        self.status = "failed"
 
     async def notify_update(self):
         """Generic notify_update method that sends task status to the update queue"""
@@ -52,6 +71,9 @@ class Task:
             body=self.body,
             started_at=self.started_at.isoformat() if self.started_at else None,
             completed_at=self.completed_at.isoformat() if self.completed_at else None,
+            error_message=self.error_message,
+            error_type=self.error_type,
+            error_traceback=self.error_traceback,
         )
 
         # Serialize the model before putting it on the queue
@@ -94,8 +116,19 @@ class Task:
             # Small delay to avoid overwhelming the update queue
             await asyncio.sleep(self.update_sleep_time)
 
-        # Wait for the sync task to complete
-        await sync_task
+        # Wait for the sync task to complete and handle any exceptions
+        try:
+            await sync_task
+        except Exception as e:
+            # Capture detailed error information
+            self.capture_error(e)
+            # Update body with error information for display
+            if not self.body or "failed" not in self.body.lower():
+                self.body = f"Task failed: {self.error_message}"
+            # Send error update
+            await self.notify_update()
+            # Re-raise the exception so the manager can handle it
+            raise
 
         # Set completed_at if task was successful
         if self.status == "done":
@@ -115,12 +148,13 @@ class ExampleCPUTask(Task):
     This mimics a CPU-bound task. Only one can run at a time,
     because it uses the 'single' semaphore."""
 
-    sleep_time: float = 0.1
-    update_sleep_time: float = 0.05  # Update every 50ms
     semaphore_name: str = "single"  # CPU-bound task - only one can run at a time
 
-    # optional arg
+    # optional args
     name: str = "Example Task"
+    sleep_time: float = 0.1
+    update_sleep_time: float = 0.05  # Update every 50ms
+    failure_probability: float = 0.0
 
     def run(self):
         """Synchronous function that does the actual work"""
@@ -135,6 +169,14 @@ class ExampleCPUTask(Task):
         self.heading = self.name
 
         for i in range(100):
+            # Check for failure probability
+            if random.random() < self.failure_probability:
+                self.status = "failed"
+                self.body = f"Task failed due to failure probability ({self.failure_probability})"
+                raise Exception(  # NOSONAR
+                    f"Task failed with probability {self.failure_probability}"
+                ) from None
+
             self.progress = i
             time.sleep(self.sleep_time)
 
@@ -158,7 +200,7 @@ class ExampleIOTask(Task):
             with open(self.progress_file, "r") as f:
                 progress_value = int(f.read().strip())
                 self.progress = progress_value
-        except (FileNotFoundError, ValueError, IOError) as e:
+        except (FileNotFoundError, ValueError, IOError):
             # Keep current progress if file reading fails
             pass
 

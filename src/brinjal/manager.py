@@ -112,8 +112,12 @@ class TaskManager:
                     try:
                         await task.execute()
                     except Exception as e:
-                        task.status = "failed"
-                        task.results = str(e)
+                        # The task should have already captured error details in execute()
+                        # But if it didn't, capture them here as a fallback
+                        if not task.error_message:
+                            task.capture_error(e)
+                        # Store the error message in results for backward compatibility
+                        task.results = task.error_message or str(e)
                         # Send final update for failed tasks
                         await task.notify_update()
                     finally:

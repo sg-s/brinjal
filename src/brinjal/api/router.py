@@ -151,11 +151,11 @@ async def delete_task(task_id: str):
 
 
 @router.post("/example_cpu_task")
-async def example_task(name: str = "Example Task"):
-    """Create and queue an example CPU task with the specified name"""
+async def example_task(name: str = "Example Task", failure_probability: float = 0.0):
+    """Create and queue an example CPU task with the specified name and failure probability"""
 
     # Create the example task
-    task = ExampleCPUTask(name=name)
+    task = ExampleCPUTask(name=name, failure_probability=failure_probability)
 
     # Add to queue
     task_id = await task_manager.add_task_to_queue(task)
