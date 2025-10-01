@@ -1,11 +1,12 @@
 """Tests for error handling functionality in tasks."""
 
-import pytest
 import asyncio
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
 
-from brinjal.task import Task, ExampleCPUTask
+import pytest
+
 from brinjal.manager import TaskManager
+from brinjal.task import ExampleCPUTask, Task
 
 
 class FailingTask(Task):
