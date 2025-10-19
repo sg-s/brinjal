@@ -42,6 +42,14 @@ class TaskList extends HTMLElement {
                 </li>
             </ul>
             
+            <!-- Tasks Tab Header with Delete All Button -->
+            <div class="d-flex justify-content-between align-items-center mt-3" id="tasks-header" style="display: none;">
+                <h5 class="mb-0">Tasks</h5>
+                <button class="btn btn-outline-danger btn-sm" id="deleteAllCompletedBtn" onclick="this.closest('task-list').deleteAllCompletedTasks()">
+                    <i class="bi bi-trash"></i> Delete All Completed
+                </button>
+            </div>
+            
             <!-- Tab Content -->
             <div class="tab-content" id="taskTabContent">
                 <!-- Tasks Tab -->
@@ -135,10 +143,25 @@ class TaskList extends HTMLElement {
                     </div>
                 </div>
             </div>
+            
+            <!-- Toast Container -->
+            <div class="toast-container position-fixed bottom-0 end-0 p-3">
+                <div id="deleteToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="toast-header">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <strong class="me-auto">Task Deletion</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">
+                        <span id="toastMessage">Tasks deleted successfully</span>
+                    </div>
+                </div>
+            </div>
         `;
         
         this.taskGrid = this.querySelector('#taskGrid');
         this.recurringTaskGrid = this.querySelector('#recurringTaskGrid');
+        this.tasksHeader = this.querySelector('#tasks-header');
         
         // Add event listener for tab changes
         const recurringTab = this.querySelector('#recurring-tab');
@@ -386,8 +409,13 @@ class TaskList extends HTMLElement {
             this.taskGrid.innerHTML = '';
             if (tasks.length === 0) {
                 this.taskGrid.innerHTML = '<div class="col-12"><p class="text-muted">No tasks found</p></div>';
+                this.tasksHeader.style.display = 'none';
                 return;
             }
+            
+            // Show the header when there are tasks
+            this.tasksHeader.style.display = 'flex';
+            
             // Reverse the order to show newest tasks first
             const reversedTasks = tasks.reverse();
             for (const task of reversedTasks) {
@@ -398,6 +426,7 @@ class TaskList extends HTMLElement {
         } catch (err) {
             console.error('Error loading tasks:', err);
             this.taskGrid.innerHTML = '<div class="col-12"><p class="text-danger">Error loading tasks</p></div>';
+            this.tasksHeader.style.display = 'none';
         }
     }
 
@@ -464,9 +493,11 @@ class TaskList extends HTMLElement {
         if (!hasTasks && !noTasksMessage) {
             // No tasks and no message - add the message
             this.taskGrid.innerHTML = '<div class="col-12"><p class="text-muted">No tasks found</p></div>';
+            this.tasksHeader.style.display = 'none';
         } else if (hasTasks && noTasksMessage && noTasksMessage.textContent === 'No tasks found') {
             // Has tasks but still showing "No tasks found" - remove the message
             noTasksMessage.remove();
+            this.tasksHeader.style.display = 'flex';
         }
     }
 
@@ -502,6 +533,88 @@ class TaskList extends HTMLElement {
         } catch (err) {
             console.error('Error deleting task:', err);
             alert('Error deleting task. Please try again.');
+        }
+    }
+
+    // Delete all completed tasks (done or failed)
+    async deleteAllCompletedTasks() {
+        // Get all task containers (col-12 divs with task IDs)
+        const taskContainers = this.taskGrid.querySelectorAll('[id^="task-"]');
+        const completedTasks = [];
+        
+        // Find all completed tasks (done or failed)
+        taskContainers.forEach(container => {
+            const badge = container.querySelector('.badge');
+            if (badge && (badge.textContent === 'DONE' || badge.textContent === 'FAILED')) {
+                const taskId = container.id.replace('task-', '');
+                completedTasks.push(taskId);
+            }
+        });
+        
+        if (completedTasks.length === 0) {
+            this.showToast('No completed tasks to delete.', false);
+            return;
+        }
+        
+        // Show loading state on the button
+        const deleteBtn = this.querySelector('#deleteAllCompletedBtn');
+        const originalText = deleteBtn.innerHTML;
+        deleteBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Deleting...';
+        deleteBtn.disabled = true;
+        
+        try {
+            // Delete all completed tasks
+            const deletePromises = completedTasks.map(taskId => {
+                const url = `${this.baseUrl}/${taskId}`;
+                return fetch(url, {
+                    method: 'DELETE',
+                });
+            });
+            
+            const responses = await Promise.all(deletePromises);
+            
+            // Check which deletions were successful
+            const successfulDeletions = [];
+            const failedDeletions = [];
+            
+            responses.forEach((response, index) => {
+                if (response.ok) {
+                    successfulDeletions.push(completedTasks[index]);
+                } else {
+                    failedDeletions.push(completedTasks[index]);
+                }
+            });
+            
+            // Remove successfully deleted tasks from the UI
+            successfulDeletions.forEach(taskId => {
+                const card = this.querySelector(`#task-${taskId}`);
+                if (card) {
+                    card.remove();
+                    // Close the task's SSE connection if it exists
+                    if (this.activeSSEConnections.has(taskId)) {
+                        this.activeSSEConnections.get(taskId).close();
+                        this.activeSSEConnections.delete(taskId);
+                    }
+                }
+            });
+            
+            // Update "No tasks found" message if needed
+            this.updateNoTasksMessage();
+            
+            // Show result message
+            if (failedDeletions.length === 0) {
+                this.showToast(`Successfully deleted ${successfulDeletions.length} completed task(s).`);
+            } else {
+                this.showToast(`Deleted ${successfulDeletions.length} task(s) successfully. Failed to delete ${failedDeletions.length} task(s).`, false);
+            }
+            
+        } catch (err) {
+            console.error('Error deleting completed tasks:', err);
+            this.showToast('Error deleting completed tasks. Please try again.', false);
+        } finally {
+            // Restore button state
+            deleteBtn.innerHTML = originalText;
+            deleteBtn.disabled = false;
         }
     }
 
@@ -696,6 +809,27 @@ class TaskList extends HTMLElement {
         modal.show();
     }
     
+    // Show toast notification
+    showToast(message, isSuccess = true) {
+        const toastElement = this.querySelector('#deleteToast');
+        const toastMessage = this.querySelector('#toastMessage');
+        const toastIcon = toastElement.querySelector('.bi');
+        
+        // Update message
+        toastMessage.textContent = message;
+        
+        // Update icon and color based on success/failure
+        if (isSuccess) {
+            toastIcon.className = 'bi bi-check-circle-fill text-success me-2';
+        } else {
+            toastIcon.className = 'bi bi-exclamation-triangle-fill text-danger me-2';
+        }
+        
+        // Show the toast
+        const toast = new bootstrap.Toast(toastElement);
+        toast.show();
+    }
+
     // Copy error details to clipboard
     copyErrorDetails() {
         if (!this.currentErrorTask) return;
