@@ -42,6 +42,14 @@ class TaskList extends HTMLElement {
                 </li>
             </ul>
             
+            <!-- Tasks Tab Header with Delete All Button -->
+            <div class="d-flex justify-content-between align-items-center mt-3" id="tasks-header" style="display: none;">
+                <h5 class="mb-0">Tasks</h5>
+                <button class="btn btn-outline-danger btn-sm" id="deleteAllCompletedBtn" onclick="this.closest('task-list').deleteAllCompletedTasks()">
+                    <i class="bi bi-trash"></i> Delete All Completed
+                </button>
+            </div>
+            
             <!-- Tab Content -->
             <div class="tab-content" id="taskTabContent">
                 <!-- Tasks Tab -->
@@ -135,10 +143,25 @@ class TaskList extends HTMLElement {
                     </div>
                 </div>
             </div>
+            
+            <!-- Toast Container -->
+            <div class="toast-container position-fixed bottom-0 end-0 p-3">
+                <div id="deleteToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="toast-header">
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        <strong class="me-auto">Task Deletion</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">
+                        <span id="toastMessage">Tasks deleted successfully</span>
+                    </div>
+                </div>
+            </div>
         `;
         
         this.taskGrid = this.querySelector('#taskGrid');
         this.recurringTaskGrid = this.querySelector('#recurringTaskGrid');
+        this.tasksHeader = this.querySelector('#tasks-header');
         
         // Add event listener for tab changes
         const recurringTab = this.querySelector('#recurring-tab');
@@ -386,8 +409,13 @@ class TaskList extends HTMLElement {
             this.taskGrid.innerHTML = '';
             if (tasks.length === 0) {
                 this.taskGrid.innerHTML = '<div class="col-12"><p class="text-muted">No tasks found</p></div>';
+                this.tasksHeader.style.display = 'none';
                 return;
             }
+            
+            // Show the header when there are tasks
+            this.tasksHeader.style.display = 'flex';
+            
             // Reverse the order to show newest tasks first
             const reversedTasks = tasks.reverse();
             for (const task of reversedTasks) {
@@ -398,6 +426,7 @@ class TaskList extends HTMLElement {
         } catch (err) {
             console.error('Error loading tasks:', err);
             this.taskGrid.innerHTML = '<div class="col-12"><p class="text-danger">Error loading tasks</p></div>';
+            this.tasksHeader.style.display = 'none';
         }
     }
 
@@ -464,9 +493,11 @@ class TaskList extends HTMLElement {
         if (!hasTasks && !noTasksMessage) {
             // No tasks and no message - add the message
             this.taskGrid.innerHTML = '<div class="col-12"><p class="text-muted">No tasks found</p></div>';
+            this.tasksHeader.style.display = 'none';
         } else if (hasTasks && noTasksMessage && noTasksMessage.textContent === 'No tasks found') {
             // Has tasks but still showing "No tasks found" - remove the message
             noTasksMessage.remove();
+            this.tasksHeader.style.display = 'flex';
         }
     }
 
@@ -502,6 +533,46 @@ class TaskList extends HTMLElement {
         } catch (err) {
             console.error('Error deleting task:', err);
             alert('Error deleting task. Please try again.');
+        }
+    }
+
+    // Delete all completed tasks (done or failed)
+    async deleteAllCompletedTasks() {
+        // Show loading state on the button
+        const deleteBtn = this.querySelector('#deleteAllCompletedBtn');
+        const originalText = deleteBtn.innerHTML;
+        deleteBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Deleting...';
+        deleteBtn.disabled = true;
+        
+        try {
+            // Call the backend API to delete all completed tasks
+            const response = await fetch(`${this.baseUrl}/completed`, {
+                method: 'DELETE',
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            // Refresh the task list to reflect the changes
+            await this.loadTasks();
+            
+            // Show result message based on backend response
+            if (result.failed_count === 0) {
+                this.showToast(result.message);
+            } else {
+                this.showToast(`${result.message}. Failed to delete ${result.failed_count} task(s).`, false);
+            }
+            
+        } catch (err) {
+            console.error('Error deleting completed tasks:', err);
+            this.showToast('Error deleting completed tasks. Please try again.', false);
+        } finally {
+            // Restore button state
+            deleteBtn.innerHTML = originalText;
+            deleteBtn.disabled = false;
         }
     }
 
@@ -696,6 +767,27 @@ class TaskList extends HTMLElement {
         modal.show();
     }
     
+    // Show toast notification
+    showToast(message, isSuccess = true) {
+        const toastElement = this.querySelector('#deleteToast');
+        const toastMessage = this.querySelector('#toastMessage');
+        const toastIcon = toastElement.querySelector('.bi');
+        
+        // Update message
+        toastMessage.textContent = message;
+        
+        // Update icon and color based on success/failure
+        if (isSuccess) {
+            toastIcon.className = 'bi bi-check-circle-fill text-success me-2';
+        } else {
+            toastIcon.className = 'bi bi-exclamation-triangle-fill text-danger me-2';
+        }
+        
+        // Show the toast
+        const toast = new bootstrap.Toast(toastElement);
+        toast.show();
+    }
+
     // Copy error details to clipboard
     copyErrorDetails() {
         if (!this.currentErrorTask) return;
