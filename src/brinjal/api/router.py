@@ -123,6 +123,55 @@ async def stream_task_updates(task_id: str, request: Request):
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
+@router.delete("/completed")
+async def delete_all_completed_tasks():
+    """Delete all completed tasks (done or failed) from the store"""
+    try:
+        # Get all tasks and filter for completed ones
+        all_tasks = task_manager.get_all_tasks()
+        completed_tasks = [
+            task for task in all_tasks if task.get("status") in ["done", "failed"]
+        ]
+
+        if not completed_tasks:
+            return {
+                "message": "No completed tasks found",
+                "deleted_count": 0,
+                "failed_count": 0,
+            }
+
+        # Delete all completed tasks
+        deleted_count = 0
+        failed_count = 0
+        failed_task_ids = []
+
+        for task in completed_tasks:
+            task_id = task.get("task_id")
+            if task_id:
+                try:
+                    removed_task = await task_manager.remove_task_from_store(task_id)
+                    if removed_task:
+                        deleted_count += 1
+                    else:
+                        failed_count += 1
+                        failed_task_ids.append(task_id)
+                except Exception:
+                    failed_count += 1
+                    failed_task_ids.append(task_id)
+
+        return {
+            "message": f"Deleted {deleted_count} completed task(s)",
+            "deleted_count": deleted_count,
+            "failed_count": failed_count,
+            "failed_task_ids": failed_task_ids,
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Internal server error: {str(e)}"
+        ) from None
+
+
 @router.delete("/{task_id}")
 async def delete_task(task_id: str):
     """Delete a task by ID from the store"""

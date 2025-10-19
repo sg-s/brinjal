@@ -538,24 +538,6 @@ class TaskList extends HTMLElement {
 
     // Delete all completed tasks (done or failed)
     async deleteAllCompletedTasks() {
-        // Get all task containers (col-12 divs with task IDs)
-        const taskContainers = this.taskGrid.querySelectorAll('[id^="task-"]');
-        const completedTasks = [];
-        
-        // Find all completed tasks (done or failed)
-        taskContainers.forEach(container => {
-            const badge = container.querySelector('.badge');
-            if (badge && (badge.textContent === 'DONE' || badge.textContent === 'FAILED')) {
-                const taskId = container.id.replace('task-', '');
-                completedTasks.push(taskId);
-            }
-        });
-        
-        if (completedTasks.length === 0) {
-            this.showToast('No completed tasks to delete.', false);
-            return;
-        }
-        
         // Show loading state on the button
         const deleteBtn = this.querySelector('#deleteAllCompletedBtn');
         const originalText = deleteBtn.innerHTML;
@@ -563,49 +545,25 @@ class TaskList extends HTMLElement {
         deleteBtn.disabled = true;
         
         try {
-            // Delete all completed tasks
-            const deletePromises = completedTasks.map(taskId => {
-                const url = `${this.baseUrl}/${taskId}`;
-                return fetch(url, {
-                    method: 'DELETE',
-                });
+            // Call the backend API to delete all completed tasks
+            const response = await fetch(`${this.baseUrl}/completed`, {
+                method: 'DELETE',
             });
             
-            const responses = await Promise.all(deletePromises);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             
-            // Check which deletions were successful
-            const successfulDeletions = [];
-            const failedDeletions = [];
+            const result = await response.json();
             
-            responses.forEach((response, index) => {
-                if (response.ok) {
-                    successfulDeletions.push(completedTasks[index]);
-                } else {
-                    failedDeletions.push(completedTasks[index]);
-                }
-            });
+            // Refresh the task list to reflect the changes
+            await this.loadTasks();
             
-            // Remove successfully deleted tasks from the UI
-            successfulDeletions.forEach(taskId => {
-                const card = this.querySelector(`#task-${taskId}`);
-                if (card) {
-                    card.remove();
-                    // Close the task's SSE connection if it exists
-                    if (this.activeSSEConnections.has(taskId)) {
-                        this.activeSSEConnections.get(taskId).close();
-                        this.activeSSEConnections.delete(taskId);
-                    }
-                }
-            });
-            
-            // Update "No tasks found" message if needed
-            this.updateNoTasksMessage();
-            
-            // Show result message
-            if (failedDeletions.length === 0) {
-                this.showToast(`Successfully deleted ${successfulDeletions.length} completed task(s).`);
+            // Show result message based on backend response
+            if (result.failed_count === 0) {
+                this.showToast(result.message);
             } else {
-                this.showToast(`Deleted ${successfulDeletions.length} task(s) successfully. Failed to delete ${failedDeletions.length} task(s).`, false);
+                this.showToast(`${result.message}. Failed to delete ${result.failed_count} task(s).`, false);
             }
             
         } catch (err) {
