@@ -13,7 +13,7 @@
         <p>This page tests the TaskList web component from brinjal.</p>
         
         <!-- Use the TaskList web component -->
-        <task-list id="taskList" base_url="http://localhost:8000"></task-list>
+        <task-list id="taskList"></task-list>
         
         <div class="mt-4">
             <h3>Test Instructions:</h3>
@@ -32,9 +32,20 @@
     <!-- Bootstrap JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     
+    <!-- Set base_url before component loads -->
+    <script>
+        // Set base_url immediately when script runs
+        (function() {
+            const taskList = document.querySelector('#taskList');
+            if (taskList) {
+                taskList.setAttribute('base_url', window.location.origin);
+            }
+        })();
+    </script>
+    
     <!-- Load the TaskList component -->
     <!-- Note: The path will depend on how the consuming application includes this router -->
-    <script src="/static/TaskList.js"></script>
+    <script src="/static/TaskList.js?v=2"></script>
     
     <script>
         // Counter for CPU task names
@@ -115,7 +126,7 @@
         
         async function addRecurringCPUTask() {
             try {
-                const response = await fetch('/example_recurring_cpu_task?cron_expression=*/1 * * * *&max_concurrent=1', {
+                const response = await fetch('/recurring/ExampleCPUTask?cron_expression=*/1 * * * *&max_concurrent=1&name=Recurring CPU Task', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -133,8 +144,9 @@
                         taskList.loadRecurringTasks();
                     }
                 } else {
-                    console.error('Failed to add recurring CPU task:', response.statusText);
-                    alert('Failed to add recurring CPU task');
+                    const errorText = await response.text();
+                    console.error('Failed to add recurring CPU task:', response.statusText, errorText);
+                    alert('Failed to add recurring CPU task: ' + errorText);
                 }
             } catch (error) {
                 console.error('Error adding recurring CPU task:', error);

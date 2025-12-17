@@ -212,8 +212,12 @@ def test_search_tasks_complex_criteria():
 
 
 def test_example_cpu_task_with_name():
-    """Test the example CPU task endpoint with custom name"""
-    response = client.post("/example_cpu_task", params={"name": "Custom Task Name"})
+    """Test the auto-generated example CPU task endpoint with custom name"""
+    # Test with JSON body
+    response = client.post(
+        "/example_cpu_task",
+        json={"name": "Custom Task Name", "failure_probability": 0.0},
+    )
     assert response.status_code == 200
 
     result = response.json()
@@ -227,9 +231,29 @@ def test_example_cpu_task_with_name():
     assert task.name == "Custom Task Name"
 
 
+def test_example_cpu_task_with_query_params():
+    """Test the auto-generated example CPU task endpoint with query parameters"""
+    # Test with query parameters (for frontend compatibility)
+    response = client.post(
+        "/example_cpu_task?name=Query%20Param%20Task&failure_probability=0.0"
+    )
+    assert response.status_code == 200
+
+    result = response.json()
+    assert "task_id" in result
+    assert len(result["task_id"]) > 0
+
+    # Verify the task was created with the query param name
+    task_id = result["task_id"]
+    task = task_manager.get_task(task_id)
+    assert task is not None
+    assert task.name == "Query Param Task"
+
+
 def test_example_cpu_task_default_name():
-    """Test the example CPU task endpoint with default name"""
-    response = client.post("/example_cpu_task")
+    """Test the auto-generated example CPU task endpoint with default name"""
+    # Empty JSON body should use defaults
+    response = client.post("/example_cpu_task", json={})
     assert response.status_code == 200
 
     result = response.json()
@@ -241,6 +265,64 @@ def test_example_cpu_task_default_name():
     task = task_manager.get_task(task_id)
     assert task is not None
     assert task.name == "Example Task"
+
+
+def test_example_cpu_task_with_all_params():
+    """Test the auto-generated example CPU task endpoint with all parameters"""
+    response = client.post(
+        "/example_cpu_task",
+        json={
+            "name": "Test Task",
+            "sleep_time": 0.2,
+            "update_sleep_time": 0.1,
+            "failure_probability": 0.5,
+        },
+    )
+    assert response.status_code == 200
+
+    result = response.json()
+    assert "task_id" in result
+    task_id = result["task_id"]
+    task = task_manager.get_task(task_id)
+    assert task is not None
+    assert task.name == "Test Task"
+    assert task.sleep_time == 0.2
+    assert task.update_sleep_time == 0.1
+    assert task.failure_probability == 0.5
+
+
+def test_example_io_task():
+    """Test the auto-generated example IO task endpoint"""
+    # ExampleIOTask has no required parameters, so empty body should work
+    response = client.post("/example_io_task", json={})
+    assert response.status_code == 200
+
+    result = response.json()
+    assert "task_id" in result
+    assert len(result["task_id"]) > 0
+
+    # Verify the task was created
+    task_id = result["task_id"]
+    task = task_manager.get_task(task_id)
+    assert task is not None
+    assert isinstance(task, ExampleIOTask)
+
+
+def test_example_io_task_with_params():
+    """Test the auto-generated example IO task endpoint with parameters"""
+    response = client.post(
+        "/example_io_task",
+        json={"sleep_time": 0.05, "progress_file": "custom_progress.txt"},
+    )
+    assert response.status_code == 200
+
+    result = response.json()
+    assert "task_id" in result
+    task_id = result["task_id"]
+    task = task_manager.get_task(task_id)
+    assert task is not None
+    assert task.sleep_time == 0.05
+    assert task.progress_file == "custom_progress.txt"
 
 
 def test_get_recurring_tasks_empty():

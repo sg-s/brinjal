@@ -80,9 +80,29 @@ Deletes a task by ID from the store.
 
 ### Task Creation
 
+Brinjal automatically generates POST endpoints for all registered Task classes. Routes are generated from the class name by converting CamelCase to snake_case.
+
+**Route Generation Examples:**
+- `ExampleCPUTask` → `/example_cpu_task`
+- `ExampleIOTask` → `/example_io_task`
+- `MyCustomTask` → `/my_custom_task`
+- `HTTPRequestTask` → `/http_request_task`
+
 #### POST `/example_cpu_task`
 
 Creates and queues an example CPU-bound task (uses "single" semaphore).
+
+**Request Body (JSON):**
+```json
+{
+  "name": "Example Task",
+  "sleep_time": 0.1,
+  "update_sleep_time": 0.05,
+  "failure_probability": 0.0
+}
+```
+
+All fields are optional and will use their default values if not provided.
 
 **Response:**
 ```json
@@ -95,12 +115,40 @@ Creates and queues an example CPU-bound task (uses "single" semaphore).
 
 Creates and queues an example I/O-bound task (uses "multiple" semaphore).
 
+**Request Body (JSON):**
+```json
+{
+  "sleep_time": 0.02,
+  "progress_file": "task_progress.txt",
+  "update_sleep_time": 0.1
+}
+```
+
+All fields are optional and will use their default values if not provided.
+
 **Response:**
 ```json
 {
   "task_id": "uuid-string"
 }
 ```
+
+#### Auto-Generated Routes
+
+When you register a Task class using `registry.register(YourTaskClass)`, Brinjal automatically creates a POST endpoint at the route path derived from the class name. The endpoint accepts a JSON body with all user-configurable fields from your task class.
+
+**Request Format:**
+```bash
+POST /your_task_name
+Content-Type: application/json
+
+{
+  "field1": "value1",
+  "field2": 42
+}
+```
+
+**Note:** Internal fields (like `task_id`, `status`, `progress`, `update_queue`, etc.) are automatically excluded from route parameters. Only fields you define in your task class are exposed as route parameters.
 
 ### Recurring Tasks
 

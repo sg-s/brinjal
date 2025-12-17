@@ -27,7 +27,8 @@ Tasks use semaphores to control how many can run concurrently:
 
 ```python
 from dataclasses import dataclass
-from .task import Task
+from brinjal.task import Task
+from brinjal.registry import registry
 
 @dataclass
 class MyCustomTask(Task):
@@ -36,11 +37,49 @@ class MyCustomTask(Task):
     # Set concurrency type based on task characteristics
     semaphore_name: str = "single"  # or "multiple" or "default"
     
+    # Add custom configuration fields
+    name: str = "My Task"
+    timeout: int = 60
+    
     def run(self):
         """Synchronous method that does the actual work"""
         # Your task logic here
         pass
+
+# Register the task to enable automatic route generation
+registry.register(MyCustomTask)
 ```
+
+### Automatic Route Generation
+
+Brinjal automatically generates API routes for all registered Task classes. When you register a task class, a POST endpoint is automatically created at `/my_custom_task` (converted from CamelCase to snake_case).
+
+**Route Generation:**
+- Class name `MyCustomTask` → Route `/my_custom_task`
+- Class name `ExampleCPUTask` → Route `/example_cpu_task`
+- Class name `HTTPRequestTask` → Route `/http_request_task`
+
+**Request Format:**
+The auto-generated route accepts a JSON body with all user-configurable fields from your task class:
+
+```bash
+POST /my_custom_task
+Content-Type: application/json
+
+{
+  "name": "Custom Task Name",
+  "timeout": 120
+}
+```
+
+**Response:**
+```json
+{
+  "task_id": "uuid-string"
+}
+```
+
+**Note:** Internal fields (like `task_id`, `status`, `progress`, etc.) are automatically excluded from the route parameters. Only fields you define in your task class (and inherited configurable fields) are exposed.
 
 ### Choosing the Right Semaphore
 
