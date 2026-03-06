@@ -581,3 +581,73 @@ def test_disable_already_disabled_task():
 
     # Verify it's still disabled
     assert task_manager.recurring_tasks[recurring_id].enabled is False
+
+
+def test_openapi_schema_formatting():
+    """Test that OpenAPI schema has properly formatted operation titles and examples"""
+    from fastapi import FastAPI
+
+    # Create a test app with the router
+    app = FastAPI()
+    app.include_router(router)
+
+    # Get the OpenAPI schema
+    openapi_schema = app.openapi()
+
+    # Check that the ExampleCPUTask endpoint has proper formatting
+    example_cpu_path = "/example_cpu_task"
+    assert example_cpu_path in openapi_schema["paths"]
+
+    post_operation = openapi_schema["paths"][example_cpu_path]["post"]
+
+    # Verify the summary/title is properly formatted (not "Create Examplecputask")
+    assert "summary" in post_operation
+    assert post_operation["summary"] == "Create Example CPU Task"
+    assert "Examplecputask" not in post_operation["summary"].lower()
+
+    # Verify the request body schema exists and has proper structure
+    assert "requestBody" in post_operation
+    request_body = post_operation["requestBody"]
+    assert "content" in request_body
+    assert "application/json" in request_body["content"]
+
+    # Get the schema for the request body
+    json_schema = request_body["content"]["application/json"]["schema"]
+
+    # FastAPI uses $ref for Pydantic models, so we need to resolve it
+    if "$ref" in json_schema or "anyOf" in json_schema:
+        # Resolve the reference from components/schemas
+        if "anyOf" in json_schema:
+            # Find the $ref in anyOf
+            ref_path = None
+            for item in json_schema["anyOf"]:
+                if "$ref" in item:
+                    ref_path = item["$ref"]
+                    break
+        else:
+            ref_path = json_schema.get("$ref")
+
+        if ref_path:
+            # Extract schema name from ref (e.g., "#/components/schemas/ExampleCPUTaskRequest")
+            schema_name = ref_path.split("/")[-1]
+            assert "components" in openapi_schema
+            assert "schemas" in openapi_schema["components"]
+            assert schema_name in openapi_schema["components"]["schemas"]
+            json_schema = openapi_schema["components"]["schemas"][schema_name]
+
+    # Verify it's not the generic "additionalProp" schema
+    assert "properties" in json_schema
+    assert "additionalProp1" not in json_schema.get("properties", {})
+
+    # Verify it has the actual task fields
+    properties = json_schema["properties"]
+    assert "name" in properties
+    assert "sleep_time" in properties
+    assert "update_sleep_time" in properties
+    assert "failure_probability" in properties
+
+    # Verify default values are present (these become examples in OpenAPI)
+    assert "default" in properties["name"]
+    assert properties["name"]["default"] == "Example Task"
+    assert "default" in properties["sleep_time"]
+    assert properties["sleep_time"]["default"] == 0.1

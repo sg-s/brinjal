@@ -1,8 +1,8 @@
 """Task routing endpoints"""
 
-import inspect
+import re
 from pathlib import Path
-from typing import Any, Dict, Optional, Type, Union, get_args, get_origin
+from typing import Dict, Optional, Type, Union, get_args, get_origin
 
 from fastapi import (
     APIRouter,
@@ -10,13 +10,15 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
+)
+from fastapi import (
     Request as FastAPIRequest,
 )
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel, create_model
 
 from ..manager import task_manager
-from ..registry import registry, TaskRegistry
+from ..registry import TaskRegistry, registry
 from ..task import ExampleCPUTask, ExampleIOTask, Task
 
 # Get the static directory path for serving files
@@ -26,6 +28,35 @@ router = APIRouter(
     tags=["tasks"],
     responses={404: {"description": "Not found"}},
 )
+
+
+def _format_class_name_for_display(class_name: str) -> str:
+    """Convert a class name to a human-readable display name.
+
+    Converts CamelCase to Title Case with spaces, preserving acronyms.
+
+    Examples:
+        ExampleCPUTask -> "Example CPU Task"
+        MyCustomTask -> "My Custom Task"
+        HTTPRequestTask -> "HTTP Request Task"
+    """
+    # Insert space before uppercase letters that follow lowercase
+    result = re.sub(r"([a-z])([A-Z])", r"\1 \2", class_name)
+    # Insert space before uppercase letters that follow uppercase and are followed by lowercase
+    result = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", result)
+
+    # Split into words and format, preserving all-uppercase acronyms
+    words = result.split()
+    formatted_words = []
+    for word in words:
+        # If word is all uppercase (acronym), keep it as-is
+        if word.isupper() and len(word) > 1:
+            formatted_words.append(word)
+        else:
+            # Capitalize first letter, lowercase the rest
+            formatted_words.append(word.capitalize())
+
+    return " ".join(formatted_words)
 
 
 def _create_request_model(
@@ -67,9 +98,11 @@ def _create_request_model(
     return create_model(model_name, **field_definitions)
 
 
-def _generate_task_route(task_class: Type[Task], route_path: str):
+def _generate_task_route(task_class: Type[Task], _route_path: str):
     """Generate a FastAPI route handler for a Task class."""
     params = registry.get_route_params(task_class)
+    request_model = _create_request_model(task_class, params)
+    display_name = _format_class_name_for_display(task_class.__name__)
 
     # Create the route handler function
     if not params:
@@ -79,19 +112,27 @@ def _generate_task_route(task_class: Type[Task], route_path: str):
             task = task_class()
             task_id = await task_manager.add_task_to_queue(task)
             return {"task_id": task_id}
+
+        route_handler.__name__ = f"create_{task_class.__name__.lower()}"
+        route_handler.__doc__ = f"Create and queue a {display_name} task"
+        return route_handler, None
     else:
         # Use Request to accept both query params and JSON body
-        async def route_handler(request: FastAPIRequest):
+        # But use Pydantic model for better OpenAPI docs
+        # FastAPI will automatically validate the body against request_model
+        # We use a closure to capture request_model for the type annotation
+        body_model_type = request_model
+
+        async def route_handler(
+            request: FastAPIRequest,
+            body: Optional[body_model_type] = Body(None),  # type: ignore
+        ):
             """Auto-generated route for {task_class.__name__}"""
             task_kwargs = {}
 
-            # Try to get JSON body first
-            try:
-                body_data = await request.json()
-                if body_data:
-                    task_kwargs.update(body_data)
-            except Exception:
-                pass  # No JSON body, will use query params
+            # Use body data if provided (from Pydantic model)
+            if body is not None:
+                task_kwargs.update(body.model_dump(exclude_unset=True))
 
             # Extract from query parameters (overrides body if both present)
             for param in params:
@@ -139,11 +180,11 @@ def _generate_task_route(task_class: Type[Task], route_path: str):
             task_id = await task_manager.add_task_to_queue(task)
             return {"task_id": task_id}
 
-    # Update function metadata
-    route_handler.__name__ = f"create_{task_class.__name__.lower()}"
-    route_handler.__doc__ = f"Create and queue a {task_class.__name__} task"
+        # Update function metadata
+        route_handler.__name__ = f"create_{task_class.__name__.lower()}"
+        route_handler.__doc__ = f"Create and queue a {display_name} task"
 
-    return route_handler, None
+        return route_handler, request_model
 
 
 def register_task_routes():
@@ -155,13 +196,20 @@ def register_task_routes():
     # Generate routes for all registered tasks
     for task_name, task_class in registry.get_all_tasks().items():
         route_path = TaskRegistry.class_name_to_route(task_name)
+        display_name = _format_class_name_for_display(task_name)
 
         # Skip if route already exists (for backward compatibility)
         # We'll remove manual routes later
-        route_handler, request_model = _generate_task_route(task_class, route_path)
+        route_handler, _ = _generate_task_route(task_class, route_path)
 
-        # Register the route
-        router.post(route_path, response_model=Dict[str, str])(route_handler)
+        # Register the route with proper OpenAPI metadata
+        # FastAPI will automatically infer the request body schema from the function signature
+        router.post(
+            route_path,
+            response_model=Dict[str, str],
+            operation_id=f"create_{task_name.lower()}",
+            summary=f"Create {display_name}",
+        )(route_handler)
 
 
 # Register all task routes on module import
