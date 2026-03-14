@@ -52,9 +52,10 @@ lint:
 format:
 	uv run ruff format .
 
-# Serve documentation
+# Serve documentation (syncs docs group first so zensical is available)
 docs:
-	uv run mkdocs serve --dev-addr=0.0.0.0:8080
+	uv sync --group docs
+	uv run zensical serve -f zensical.toml --dev-addr=0.0.0.0:8080
 
 # Build package
 build:

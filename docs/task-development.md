@@ -4,6 +4,64 @@
 
 This guide explains how to create and manage tasks in the Brinjal task system. The system uses semaphore-based concurrency control to efficiently manage both CPU-bound and I/O-bound tasks.
 
+## Creating a new task
+
+### What to inherit and implement
+
+1. **Inherit from `Task`**  
+   Your task class must subclass `brinjal.task.Task`.
+
+2. **Use `@dataclass`**  
+   The base `Task` is a dataclass; your subclass must be a dataclass too so the registry can inspect fields for route generation.
+
+3. **Implement `run()`**  
+   You must implement the synchronous `run(self)` method. It does the actual work. It runs in a thread (via `asyncio.to_thread`), so it must be synchronous. Do not override `execute()`; the base class uses it to run `run()` and handle progress/errors.
+
+4. **Optionally override `progress_hook(self)`**  
+   Override this if progress comes from somewhere else (e.g. a file or external process). It is called periodically while the task runs; update `self.progress` (and optionally `self.heading`, `self.body`) there.
+
+Minimal example:
+
+```python
+from dataclasses import dataclass
+from brinjal.task import Task
+
+@dataclass
+class MyTask(Task):
+    def run(self):
+        """Synchronous work. Required."""
+        self.heading = "My Task"
+        self.body = "Running..."
+        # ... do work, set self.progress (0-100) and self.status = "done" or "failed"
+        self.status = "done"
+```
+
+Register the task so the API exposes a route for it:
+
+```python
+from brinjal.registry import registry
+registry.register(MyTask)
+```
+
+## How progress updates work
+
+Progress and status are pushed to clients over **Server-Sent Events (SSE)**.
+
+1. **What gets sent**  
+   The task manager sends updates when any of these change: `progress`, `heading`, `body`, `img`, `status`. Updates are `TaskUpdate` objects (task_id, status, progress, heading, body, etc.).
+
+2. **Where to set values**  
+   In your `run()` method, set `self.progress` (0–100), `self.heading`, and `self.body` as the task runs. The base `execute()` loop checks these periodically (every `update_sleep_time` seconds) and pushes an update whenever they change.
+
+3. **Progress from outside**  
+   If progress comes from an external source (e.g. a subprocess or file), override `progress_hook(self)`. It is called in the same loop; read the external source and set `self.progress` (and optionally `self.heading`/`self.body`) there. See `ExampleIOTask` in `brinjal.task` for a file-based example.
+
+4. **How clients receive updates**  
+   Clients subscribe to a task’s stream with `GET /{task_id}/stream`. The response is `text/event-stream`; each event is a JSON object with the latest task state. The stream ends when `status` is `done` or `failed`.
+
+5. **Tuning**  
+   `update_sleep_time` (default `0.05`) controls how often the loop checks for changes. Smaller values mean more responsive updates but more CPU; increase it if you don’t need fine-grained progress.
+
 ## Task Concurrency System
 
 ### Semaphore-Based Concurrency

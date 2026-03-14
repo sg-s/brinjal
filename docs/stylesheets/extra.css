@@ -1,0 +1,9 @@
+/* Override link underlines – match Material-style: no underline by default, underline on hover */
+.md-content a,
+.md-typeset a {
+  text-decoration: none;
+}
+.md-content a:hover,
+.md-typeset a:hover {
+  text-decoration: underline;
+}

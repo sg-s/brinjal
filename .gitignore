@@ -11,3 +11,5 @@ src/brinjal/_version.py
 # Virtual environments
 .venv
 .DS_Store
+
+site/*

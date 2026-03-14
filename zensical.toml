@@ -1,0 +1,83 @@
+# Brinjal documentation – Zensical config
+# See https://zensical.org/docs/setup/basics/
+
+[project]
+site_name = "Brinjal"
+site_description = "Generic task management system built with FastAPI and asyncio"
+site_author = "Srinivas Gorur-Shandilya"
+site_url = "https://sg-s.github.io/brinjal"
+docs_dir = "docs"
+site_dir = "site"
+repo_name = "sg-s/brinjal"
+repo_url = "https://github.com/sg-s/brinjal"
+edit_uri = "edit/main/docs/"
+extra_css = ["stylesheets/extra.css"]
+extra_javascript = [
+    "javascripts/mathjax.js",
+    "https://polyfill.io/v3/polyfill.min.js?features=es6",
+    "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+]
+
+nav = [
+    {"Home" = "index.md"},
+    {"Getting Started" = "getting-started.md"},
+    {"Tutorial" = "tutorial.md"},
+    {"How-to" = "how-to.md"},
+    {"Task Development" = "task-development.md"},
+    {"Reference" = "api-reference.md"},
+    {"Web Component" = "web-component.md"},
+    {"Integration Guide" = "integration.md"}
+]
+
+[project.theme]
+features = [
+    "navigation.tabs",
+    "navigation.sections",
+    "navigation.expand",
+    "navigation.top",
+    "search.highlight",
+    "search.share"
+]
+
+[[project.theme.palette]]
+scheme = "default"
+primary = "purple"
+accent = "purple"
+toggle.icon = "material/toggle-switch"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+scheme = "slate"
+primary = "purple"
+accent = "purple"
+toggle.icon = "material/toggle-switch-off-outline"
+toggle.name = "Switch to light mode"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/sg-s/brinjal"
+
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["../src"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+show_source = true
+show_root_heading = true
+
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.footnotes]
+[project.markdown_extensions.meta]
+
+[project.markdown_extensions.toc]
+anchorlink = true
+permalink = true
+title = "On this page"
+
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.snippets]
+[project.markdown_extensions.pymdownx.superfences]

@@ -2,6 +2,22 @@
 
 Brinjal supports recurring tasks that automatically execute at specified intervals using cron-like syntax. This feature allows you to set up automated workflows that run periodically without manual intervention.
 
+## Quick reference
+
+**How to make a recurring task:** Create a fully configured **template** task instance, then call `task_manager.add_recurring_task(cron_expression=..., template_task=..., max_concurrent=...)`. The manager clones the template each time the schedule fires and enqueues the new task.
+
+**When it recurs:** You specify the schedule with a **cron expression** (standard 5-field: minute, hour, day of month, month, day of week). Brinjal uses the `croniter` library to compute the next run time. Examples:
+
+| Cron expression   | Meaning                    |
+|-------------------|----------------------------|
+| `*/5 * * * *`     | Every 5 minutes            |
+| `0 * * * *`       | Every hour at minute 0      |
+| `0 2 * * *`       | Every day at 02:00          |
+| `0 9 * * 1`       | Every Monday at 09:00       |
+| `0 0 1 * *`       | First day of every month at midnight |
+
+See [Cron expression format](#cron-expression-format) below for the full format. Recurring tasks are checked every second; when the current time is past `next_run`, a new task is queued and `next_run` is advanced to the next occurrence.
+
 ## Overview
 
 Recurring tasks in Brinjal are managed by the `TaskManager` and use the `croniter` library for flexible scheduling. Each recurring task configuration creates new task instances at the specified intervals, maintaining parent-child relationships for tracking and monitoring.

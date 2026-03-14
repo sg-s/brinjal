@@ -79,7 +79,7 @@ Brinjal includes a reusable web component for displaying tasks:
 <body>
     <!-- Load the TaskList component from your brinjal endpoint -->
     <script src="/api/tasks/static/TaskList.js"></script>
-    
+
     <!-- Use the component -->
     <task-list base_url="https://yourdomain.com"></task-list>
 </body>
@@ -126,7 +126,7 @@ class MyCustomTask(Task):
         for i in range(10):
             self.progress = i * 10
             time.sleep(1)
-        
+
         self.status = "done"
         self.progress = 100
         self.heading = "Custom Task Complete"
