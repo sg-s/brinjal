@@ -60,6 +60,21 @@ def test_add_recurring_task(task_manager, example_task):
     assert recurring_info.enabled is True
 
 
+def test_add_recurring_task_does_not_enqueue_immediately(task_manager, example_task):
+    """Recurring registration must not queue a run until the scheduler fires."""
+    recurring_id = asyncio.run(
+        task_manager.add_recurring_task(
+            cron_expression="*/5 * * * *",
+            template_task=example_task,
+        )
+    )
+
+    assert task_manager.task_queue.qsize() == 0
+    recurring_info = task_manager.recurring_tasks[recurring_id]
+    assert recurring_info.next_run is not None
+    assert recurring_info.next_run > datetime.now()
+
+
 def test_get_recurring_task(task_manager, example_task):
     """Test retrieving a recurring task by ID"""
     recurring_id = asyncio.run(

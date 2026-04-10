@@ -455,7 +455,19 @@ class TaskManager:
         template_task: Task,
         max_concurrent: int = 1,
     ) -> str:
-        """Add a recurring task that will be re-queued based on cron expression"""
+        """Register a recurring task scheduled by a cron expression.
+
+        The first task instance is queued when the current time reaches the next
+        cron match (via ``_recurring_scheduler``), not at registration time.
+
+        Args:
+            cron_expression: Standard 5-field cron string.
+            template_task: Task to clone for each scheduled run.
+            max_concurrent: Max simultaneous instances for this recurring id.
+
+        Returns:
+            The new recurring task configuration id.
+        """
 
         recurring_info = RecurringTaskInfo(
             cron_expression=cron_expression,
@@ -465,10 +477,6 @@ class TaskManager:
         )
 
         self.recurring_tasks[recurring_info.recurring_id] = recurring_info
-
-        # Create and queue initial task instance
-        initial_task = self._clone_task(template_task, recurring_info.recurring_id)
-        await self.add_task_to_queue(initial_task)
 
         return recurring_info.recurring_id
 

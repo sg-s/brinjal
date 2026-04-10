@@ -6,6 +6,8 @@ Brinjal supports recurring tasks that automatically execute at specified interva
 
 **How to make a recurring task:** Create a fully configured **template** task instance, then call `task_manager.add_recurring_task(cron_expression=..., template_task=..., max_concurrent=...)`. The manager clones the template each time the schedule fires and enqueues the new task.
 
+**First run:** Registration does **not** enqueue a task immediately. The first instance runs at the **next** cron match after registration (or after app startup if you recreate configs in lifespan). For example, `0 3 * * *` with the app starting at 10:00 will wait until 03:00 the following day.
+
 **When it recurs:** You specify the schedule with a **cron expression** (standard 5-field: minute, hour, day of month, month, day of week). Brinjal uses the `croniter` library to compute the next run time. Examples:
 
 | Cron expression   | Meaning                    |
@@ -20,7 +22,7 @@ See [Cron expression format](#cron-expression-format) below for the full format.
 
 ## Overview
 
-Recurring tasks in Brinjal are managed by the `TaskManager` and use the `croniter` library for flexible scheduling. Each recurring task configuration creates new task instances at the specified intervals, maintaining parent-child relationships for tracking and monitoring.
+Recurring tasks in Brinjal are managed by the `TaskManager` and use the `croniter` library for flexible scheduling. Each recurring task configuration creates new task instances when the scheduler reaches each scheduled time (not at registration), maintaining parent-child relationships for tracking and monitoring.
 
 ## Key Concepts
 
@@ -250,6 +252,10 @@ dependencies = [
     # ... other dependencies
 ]
 ```
+
+## Migration note
+
+Older behavior queued one run as soon as `add_recurring_task` was called. If you still need an immediate run in addition to the cron, enqueue a clone yourself once (for example after `add_recurring_task`, build a task and call `await task_manager.add_task_to_queue(...)`).
 
 ## Limitations
 

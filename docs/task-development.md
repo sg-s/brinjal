@@ -43,6 +43,10 @@ from brinjal.registry import registry
 registry.register(MyTask)
 ```
 
+### Which fields become HTTP parameters
+
+The registry builds enqueue (POST) bodies from your dataclass fields, but **skips** names in `brinjal.registry.EXCLUDED_FIELDS`. That includes all built-in `Task` runtime state (`status`, `progress`, `heading`, `body`, `img`, …), plus **`semaphore_name`**, **`update_sleep_time`**, and similar: set those on the class in code (subclass defaults), not via the generic task API. Only add new fields on your subclass for values callers should pass when creating a job (e.g. `youtube_id: str | None = None`).
+
 ## How progress updates work
 
 Progress and status are pushed to clients over **Server-Sent Events (SSE)**.

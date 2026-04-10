@@ -159,4 +159,6 @@ recurring_id = await task_manager.add_recurring_task(
 )
 ```
 
+The first run happens at the next 02:00 after this call, not immediately when the app starts.
+
 See [Recurring tasks](recurring-tasks.md) for cron format and management (enable/disable, list, remove).
