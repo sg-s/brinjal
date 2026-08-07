@@ -69,6 +69,7 @@ class Task:
             img=self.img,
             heading=self.heading,
             body=self.body,
+            results=self.results,
             started_at=self.started_at.isoformat() if self.started_at else None,
             completed_at=self.completed_at.isoformat() if self.completed_at else None,
             error_message=self.error_message,

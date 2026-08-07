@@ -312,6 +312,7 @@ class TaskManager:
                 img=task.img,
                 heading=task.heading,
                 body=task.body,
+                results=task.results,
                 started_at=task.started_at.isoformat() if task.started_at else None,
                 completed_at=task.completed_at.isoformat()
                 if task.completed_at
@@ -391,6 +392,7 @@ class TaskManager:
                 img=task.img,
                 heading=task.heading,
                 body=task.body,
+                results=task.results,
                 started_at=task.started_at.isoformat() if task.started_at else None,
                 completed_at=task.completed_at.isoformat()
                 if task.completed_at

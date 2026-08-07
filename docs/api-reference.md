@@ -254,6 +254,7 @@ class TaskUpdate(BaseModel):
     img: Optional[str]
     heading: Optional[str]
     body: Optional[str]
+    results: Optional[Any]
     started_at: Optional[str]
     completed_at: Optional[str]
 ```

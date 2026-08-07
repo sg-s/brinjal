@@ -2,7 +2,7 @@
 
 import re
 from dataclasses import MISSING, fields, is_dataclass
-from typing import Dict, List, Type, TypeVar
+from typing import Dict, List, Type, TypeVar, get_type_hints
 
 from .task import Task
 
@@ -78,6 +78,12 @@ class TaskRegistry:
         """
         params = []
         task_fields = fields(task_class)
+        # Resolve postponed annotations (``from __future__ import annotations``)
+        # so Pydantic request models get real types (e.g. Literal), not strings.
+        try:
+            resolved_hints = get_type_hints(task_class)
+        except Exception:
+            resolved_hints = {}
 
         for field_info in task_fields:
             field_name = field_info.name
@@ -86,8 +92,8 @@ class TaskRegistry:
             if field_name in EXCLUDED_FIELDS:
                 continue
 
-            # Get field type
-            field_type = field_info.type
+            # Prefer resolved hints; fall back to the raw dataclass field type
+            field_type = resolved_hints.get(field_name, field_info.type)
 
             # Determine if field has a default value
             has_default = field_info.default is not MISSING

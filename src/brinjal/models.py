@@ -1,6 +1,6 @@
 """Types and models for the brinjal project."""
 
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -18,6 +18,7 @@ class TaskUpdate(BaseModel):
     img: Optional[str] = None
     heading: Optional[str] = None
     body: Optional[str] = None
+    results: Optional[Any] = None
     started_at: Optional[str] = None  # ISO format timestamp when task started
     completed_at: Optional[str] = None  # ISO format timestamp when task completed
 

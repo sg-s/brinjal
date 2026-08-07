@@ -20,6 +20,9 @@ This guide explains how to create and manage tasks in the Brinjal task system. T
 4. **Optionally override `progress_hook(self)`**  
    Override this if progress comes from somewhere else (e.g. a file or external process). It is called periodically while the task runs; update `self.progress` (and optionally `self.heading`, `self.body`) there.
 
+5. **Be careful with ``from __future__ import annotations``**  
+   The registry resolves postponed annotations via ``typing.get_type_hints``. Prefer real runtime types for route fields (especially ``Literal[...]``). If you use postponed annotations, keep types resolvable in the task module namespace.
+
 Minimal example:
 
 ```python
@@ -52,7 +55,7 @@ The registry builds enqueue (POST) bodies from your dataclass fields, but **skip
 Progress and status are pushed to clients over **Server-Sent Events (SSE)**.
 
 1. **What gets sent**  
-   The task manager sends updates when any of these change: `progress`, `heading`, `body`, `img`, `status`. Updates are `TaskUpdate` objects (task_id, status, progress, heading, body, etc.).
+   The task manager sends updates when any of these change: `progress`, `heading`, `body`, `img`, `status`, `results`. Updates are `TaskUpdate` objects (task_id, status, progress, heading, body, results, etc.).
 
 2. **Where to set values**  
    In your `run()` method, set `self.progress` (0–100), `self.heading`, and `self.body` as the task runs. The base `execute()` loop checks these periodically (every `update_sleep_time` seconds) and pushes an update whenever they change.
